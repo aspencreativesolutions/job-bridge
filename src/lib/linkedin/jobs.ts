@@ -1,6 +1,15 @@
 import type { LinkedInJob, JobPreferencesData } from "../types";
+import { jobMatchesSalary } from "../jobs/match";
 
 const LINKEDIN_JOBS_API = "https://api.linkedin.com/v2/jobSearch";
+
+const MOCK_SALARIES = [
+  { min: 65000, max: 85000 },
+  { min: 80000, max: 110000 },
+  { min: 95000, max: 130000 },
+  { min: 120000, max: 160000 },
+  { min: 140000, max: 190000 },
+];
 
 export async function getLinkedInAccessToken(
   userId: string
@@ -48,7 +57,9 @@ export async function searchLinkedInJobs(
     }
 
     const data = await response.json();
-    return parseLinkedInResponse(data);
+    return parseLinkedInResponse(data).filter((job) =>
+      jobMatchesSalary(job, preferences)
+    );
   } catch (error) {
     console.warn("LinkedIn job search failed, using mock:", error);
     return mockJobSearch(preferences);
@@ -91,18 +102,33 @@ function mockJobSearch(preferences: JobPreferencesData): LinkedInJob[] {
   ];
 
   const now = Date.now();
-  return titles.flatMap((title, ti) =>
+  const jobs = titles.flatMap((title, ti) =>
     industries.slice(0, 2).map((industry, ii) => {
       const idx = ti * 2 + ii;
+      const salary = MOCK_SALARIES[idx % MOCK_SALARIES.length];
       return {
         externalId: `mock-${title.toLowerCase().replace(/\s+/g, "-")}-${idx}-${Math.floor(now / 86400000)}`,
         title: `${title} — ${industry}`,
         company: companies[idx % companies.length],
         location: preferences.locations[0] ?? "Remote",
-        description: `We are looking for a talented ${title} to join our ${industry} team.`,
+        description: `We are looking for a talented ${title} to join our ${industry} team. Annual compensation discussed during interview.`,
+        salaryMin: salary.min,
+        salaryMax: salary.max,
         url: `https://www.linkedin.com/jobs/view/mock-${idx}`,
         postedAt: new Date(now - idx * 3600000),
       };
     })
   );
+
+  return jobs.filter((job) => jobMatchesSalary(job, preferences));
 }
+
+function formatSalary(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+export { formatSalary };

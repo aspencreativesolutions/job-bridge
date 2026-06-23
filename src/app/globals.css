@@ -22,5 +22,31 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+@layer components {
+  .page-title {
+    @apply text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50;
+  }
+
+  .section-title {
+    @apply text-2xl font-bold text-zinc-900 dark:text-zinc-50;
+  }
+
+  .card-label {
+    @apply text-lg font-bold text-zinc-700 dark:text-zinc-300;
+  }
+
+  .card-value {
+    @apply text-4xl font-bold text-zinc-900 dark:text-zinc-50;
+  }
+
+  .item-title {
+    @apply text-xl font-bold text-zinc-900 dark:text-zinc-50;
+  }
+
+  .nav-link {
+    @apply text-base font-bold text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100;
+  }
 }

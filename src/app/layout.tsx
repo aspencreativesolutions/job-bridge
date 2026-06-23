@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Job Bridge — Smart Job Applications",
   description:
-    "Upload your resume, connect LinkedIn, monitor jobs, and auto-apply with customizable settings.",
+    "AI-powered job alerts and application automation.",
 };
 
 export default function RootLayout({

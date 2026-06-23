@@ -9,8 +9,8 @@ export default async function HomePage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-20 text-center">
-      <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-        Apply smarter with Job Bridge
+      <h1 className="text-5xl font-bold tracking-tight sm:text-6xl">
+        AI-powered job alerts and application automation.
       </h1>
       <p className="mx-auto mt-4 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
         Upload your resume, connect LinkedIn, set job filters, and let Job Bridge monitor
@@ -65,7 +65,7 @@ function Feature({
   return (
     <div className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
       <Icon className="mb-3 h-8 w-8 text-zinc-700 dark:text-zinc-300" />
-      <h3 className="font-semibold">{title}</h3>
+      <h3 className="item-title">{title}</h3>
       <p className="mt-2 text-sm text-zinc-500">{description}</p>
     </div>
   );

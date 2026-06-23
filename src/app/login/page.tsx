@@ -1,19 +1,22 @@
-import { signIn, isLinkedInConfigured } from "@/lib/auth";
+import { isLinkedInConfigured } from "@/lib/auth";
 import Link from "next/link";
+import { signInWithLinkedIn } from "@/app/actions/auth";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; callbackUrl?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, callbackUrl } = await searchParams;
+  const redirectTo = callbackUrl?.startsWith("/") ? callbackUrl : "/dashboard";
   const configured = isLinkedInConfigured();
 
   return (
     <div className="mx-auto flex max-w-md flex-col items-center px-4 py-20">
-      <h1 className="text-2xl font-semibold">Sign in to Job Bridge</h1>
+      <h1 className="page-title">Sign in to Job Bridge</h1>
       <p className="mt-2 text-center text-sm text-zinc-500">
-        Connect your LinkedIn account to search jobs and manage applications.
+        Sign in to access Job Bridge. You&apos;ll connect your LinkedIn profile
+        on the next step.
       </p>
 
       {!configured ? (
@@ -29,7 +32,7 @@ export default async function LoginPage({
           <pre className="mt-3 overflow-x-auto rounded bg-amber-100/80 p-3 text-xs dark:bg-amber-900/40">
 {`AUTH_LINKEDIN_ID=your_client_id
 AUTH_LINKEDIN_SECRET=your_client_secret
-AUTH_URL=http://localhost:3000`}
+AUTH_URL=http://localhost:3000/api/auth`}
           </pre>
           <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">
             Create an app at{" "}
@@ -58,10 +61,7 @@ AUTH_URL=http://localhost:3000`}
 
           <form
             className="mt-8 w-full"
-            action={async () => {
-              "use server";
-              await signIn("linkedin", { redirectTo: "/dashboard" });
-            }}
+            action={signInWithLinkedIn.bind(null, redirectTo)}
           >
             <button
               type="submit"
@@ -82,10 +82,10 @@ AUTH_URL=http://localhost:3000`}
       )}
 
       <Link
-        href="/"
+        href="/privacy"
         className="mt-6 text-sm text-zinc-500 underline hover:text-zinc-700"
       >
-        Back to home
+        Privacy policy
       </Link>
     </div>
   );

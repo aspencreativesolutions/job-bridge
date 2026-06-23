@@ -1,11 +1,14 @@
 import { db } from "../db";
 import type { JobPreferencesData } from "../types";
+import { jobMatchesSalary } from "./match";
 
 export function parseJobPreferences(raw: {
   jobTitles: string;
   industries: string;
   locations: string;
   keywords: string;
+  salaryMin: number | null;
+  salaryMax: number | null;
   autoApply: boolean;
   notifyEmail: boolean;
   notifyInApp: boolean;
@@ -24,6 +27,8 @@ export function parseJobPreferences(raw: {
     industries: parseJson(raw.industries),
     locations: parseJson(raw.locations),
     keywords: parseJson(raw.keywords),
+    salaryMin: raw.salaryMin,
+    salaryMax: raw.salaryMax,
     autoApply: raw.autoApply,
     notifyEmail: raw.notifyEmail,
     notifyInApp: raw.notifyInApp,
@@ -59,6 +64,8 @@ export async function scanJobsForUser(userId: string): Promise<{
   let applicationsCreated = 0;
 
   for (const job of jobs) {
+    if (!jobMatchesSalary(job, preferences)) continue;
+
     const existing = await db.jobListing.findUnique({
       where: {
         userId_externalId: { userId, externalId: job.externalId },
@@ -75,6 +82,8 @@ export async function scanJobsForUser(userId: string): Promise<{
         company: job.company,
         location: job.location,
         description: job.description,
+        salaryMin: job.salaryMin,
+        salaryMax: job.salaryMax,
         url: job.url,
         postedAt: job.postedAt,
         isNew: true,

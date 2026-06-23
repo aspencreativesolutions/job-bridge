@@ -104,7 +104,7 @@ export function ResumeEditor({ initialContent }: Props) {
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Resume Editor</h1>
+          <h1 className="page-title">Resume Editor</h1>
           <p className="text-sm text-zinc-500">
             Upload a resume or edit sections below. Saving replaces your active resume.
           </p>
@@ -222,7 +222,7 @@ function Section({
 }) {
   return (
     <section className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
-      <h2 className="mb-4 text-lg font-medium">{title}</h2>
+      <h2 className="section-title mb-4">{title}</h2>
       {children}
     </section>
   );

@@ -22,6 +22,7 @@ model User {
   jobListings       JobListing[]
   applications      Application[]
   notifications     Notification[]
+  linkedInProfile   LinkedInProfile?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -91,6 +92,8 @@ model JobPreference {
   industries      String   @default("[]") // JSON array
   locations       String   @default("[]") // JSON array
   keywords        String   @default("[]") // JSON array
+  salaryMin       Int?
+  salaryMax       Int?
   autoApply       Boolean  @default(false)
   notifyEmail     Boolean  @default(true)
   notifyInApp     Boolean  @default(true)
@@ -118,6 +121,8 @@ model JobListing {
   company      String
   location     String?
   description  String?
+  salaryMin    Int?
+  salaryMax    Int?
   url          String?
   source       String   @default("linkedin")
   postedAt     DateTime?
@@ -153,4 +158,23 @@ model Notification {
   read      Boolean  @default(false)
   metadata  String?  // JSON
   createdAt DateTime @default(now())
+}
+
+model LinkedInProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  headline            String?
+  skills              String   @default("[]") // JSON array
+  experience          String   @default("[]") // JSON array of { title, company }
+  education           String   @default("[]") // JSON array of { school, degree }
+  jobPreferences      String   @default("[]") // JSON array of { title, location }
+  profileCompleteness Int      @default(0) // 0-100
+  profileUrl          String?
+  warnings            String?  // JSON array of API limitation messages
+  rawData             String?  // JSON snapshot from API
+  connectedAt         DateTime @default(now())
+  fetchedAt           DateTime @default(now())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }

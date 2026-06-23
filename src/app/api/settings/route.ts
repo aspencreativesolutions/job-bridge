@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getOrCreateJobPreferences, parseJobPreferences } from "@/lib/jobs/scanner";
+import {
+  getOrCreateJobPreferences,
+  parseJobPreferences,
+  scanJobsForUser,
+} from "@/lib/jobs/scanner";
 import { DEFAULT_COVER_LETTER } from "@/lib/types";
 
 export async function GET() {
@@ -30,7 +34,7 @@ export async function PUT(request: Request) {
   }
 
   const body = await request.json();
-  const { preferences, coverLetter } = body;
+  const { preferences, coverLetter, refreshJobs } = body;
 
   await getOrCreateJobPreferences(session.user.id);
 
@@ -41,6 +45,8 @@ export async function PUT(request: Request) {
       industries: JSON.stringify(preferences.industries ?? []),
       locations: JSON.stringify(preferences.locations ?? []),
       keywords: JSON.stringify(preferences.keywords ?? []),
+      salaryMin: preferences.salaryMin ?? null,
+      salaryMax: preferences.salaryMax ?? null,
       autoApply: preferences.autoApply ?? false,
       notifyEmail: preferences.notifyEmail ?? true,
       notifyInApp: preferences.notifyInApp ?? true,
@@ -59,8 +65,14 @@ export async function PUT(request: Request) {
     });
   }
 
+  let scanResult = null;
+  if (refreshJobs) {
+    scanResult = await scanJobsForUser(session.user.id);
+  }
+
   return NextResponse.json({
     preferences: parseJobPreferences(updated),
     coverLetter,
+    scanResult,
   });
 }

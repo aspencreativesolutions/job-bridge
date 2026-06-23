@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
 import { Briefcase, FileText, Settings, LayoutDashboard, LogOut } from "lucide-react";
@@ -14,9 +15,17 @@ export async function Nav() {
 
   return (
     <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="text-lg font-semibold tracking-tight">
-          Job Bridge
+      <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-4">
+        <Link href="/" className="flex items-center">
+          <Image
+            src="/logo.png"
+            alt="Job Bridge"
+            width={72}
+            height={72}
+            className="h-[4.5rem] w-auto"
+            priority
+            unoptimized
+          />
         </Link>
 
         {session?.user ? (
@@ -25,9 +34,9 @@ export async function Nav() {
               <Link
                 key={href}
                 href={href}
-                className="flex items-center gap-1.5 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
+                className="nav-link flex items-center gap-2 rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-900"
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-5 w-5" />
                 {label}
               </Link>
             ))}
@@ -39,7 +48,7 @@ export async function Nav() {
             >
               <button
                 type="submit"
-                className="ml-2 flex items-center gap-1.5 rounded-md px-3 py-2 text-sm text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                className="ml-2 nav-link flex items-center gap-2 rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-900"
               >
                 <LogOut className="h-4 w-4" />
                 Sign out

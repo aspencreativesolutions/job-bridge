@@ -56,7 +56,7 @@ export function SettingsPanel({
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Settings</h1>
+          <h1 className="page-title">Settings</h1>
           <p className="text-sm text-zinc-500">
             Configure job filters, notifications, auto-apply, and cover letter.
           </p>
@@ -78,7 +78,7 @@ export function SettingsPanel({
       )}
 
       <section className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
-        <h2 className="mb-4 text-lg font-medium">LinkedIn</h2>
+        <h2 className="section-title mb-4">LinkedIn</h2>
         <p className="mb-4 text-sm text-zinc-500">
           Connect LinkedIn to search jobs with your OAuth token.
         </p>
@@ -97,7 +97,7 @@ export function SettingsPanel({
       </section>
 
       <section className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
-        <h2 className="mb-4 text-lg font-medium">Job filters</h2>
+        <h2 className="section-title mb-4">Job filters</h2>
         <div className="grid gap-4">
           <ListField
             label="Target job titles (comma-separated)"
@@ -123,6 +123,40 @@ export function SettingsPanel({
             onChange={(v) => updateList("keywords", v)}
             placeholder="React, TypeScript, remote"
           />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm">
+              <span className="mb-1 block text-zinc-500">Min salary (USD / yr)</span>
+              <input
+                type="number"
+                min={0}
+                step={1000}
+                className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                value={preferences.salaryMin ?? ""}
+                onChange={(e) =>
+                  setPreferences((p) => ({
+                    ...p,
+                    salaryMin: e.target.value ? parseInt(e.target.value, 10) : null,
+                  }))
+                }
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-zinc-500">Max salary (USD / yr)</span>
+              <input
+                type="number"
+                min={0}
+                step={1000}
+                className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                value={preferences.salaryMax ?? ""}
+                onChange={(e) =>
+                  setPreferences((p) => ({
+                    ...p,
+                    salaryMax: e.target.value ? parseInt(e.target.value, 10) : null,
+                  }))
+                }
+              />
+            </label>
+          </div>
           <label className="block text-sm">
             <span className="mb-1 block text-zinc-500">
               Scan interval (minutes)
@@ -145,7 +179,7 @@ export function SettingsPanel({
       </section>
 
       <section className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
-        <h2 className="mb-4 text-lg font-medium">Notifications & auto-apply</h2>
+        <h2 className="section-title mb-4">Notifications & auto-apply</h2>
         <div className="space-y-3">
           <Toggle
             label="In-app notifications for new jobs"
@@ -178,7 +212,7 @@ export function SettingsPanel({
       </section>
 
       <section className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
-        <h2 className="mb-2 text-lg font-medium">Cover letter template</h2>
+        <h2 className="section-title mb-2">Cover letter template</h2>
         <p className="mb-4 text-xs text-zinc-500">
           Use {"{{job_title}}"}, {"{{company}}"}, {"{{name}}"}, {"{{summary}}"} as
           placeholders.

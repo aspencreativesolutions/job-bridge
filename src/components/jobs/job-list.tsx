@@ -63,7 +63,7 @@ export function JobList() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Job listings</h1>
+          <h1 className="page-title">Job listings</h1>
           <p className="text-sm text-zinc-500">
             Jobs matching your criteria from LinkedIn.
           </p>
@@ -99,7 +99,7 @@ export function JobList() {
               >
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-medium">{job.title}</h3>
+                    <h3 className="item-title">{job.title}</h3>
                     {job.isNew && (
                       <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                         New

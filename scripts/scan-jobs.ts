@@ -6,7 +6,10 @@
  */
 
 async function runScan() {
-  const baseUrl = process.env.AUTH_URL ?? "http://localhost:3000";
+  const baseUrl = (process.env.AUTH_URL ?? "http://localhost:3000/api/auth").replace(
+    /\/api\/auth\/?$/,
+    ""
+  );
   const cronSecret = process.env.CRON_SECRET ?? "dev-cron-secret";
 
   const res = await fetch(`${baseUrl}/api/jobs/scan`, {

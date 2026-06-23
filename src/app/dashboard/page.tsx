@@ -1,56 +1,73 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { getOrCreateJobPreferences, parseJobPreferences } from "@/lib/jobs/scanner";
+import {
+  connectLinkedInProfile,
+  getLinkedInProfileForUser,
+  hasLinkedInAccount,
+} from "@/lib/linkedin/store";
 import { NotificationBell } from "@/components/notifications/notification-bell";
-import { ApplicationsList } from "@/components/applications/applications-list";
+import { DashboardView } from "@/components/dashboard/dashboard-view";
 import Link from "next/link";
 
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const [jobCount, applicationCount, prefs] = await Promise.all([
+  const prefs = await getOrCreateJobPreferences(session.user.id);
+  const preferences = parseJobPreferences(prefs);
+
+  const [jobCount, applicationCount, linkedInConnected] = await Promise.all([
     db.jobListing.count({ where: { userId: session.user.id } }),
     db.application.count({ where: { userId: session.user.id } }),
-    db.jobPreference.findUnique({ where: { userId: session.user.id } }),
+    hasLinkedInAccount(session.user.id),
   ]);
 
+  let linkedInProfile = await getLinkedInProfileForUser(session.user.id);
+  if (!linkedInProfile && linkedInConnected) {
+    try {
+      linkedInProfile = await connectLinkedInProfile(session.user.id);
+    } catch {
+      linkedInProfile = null;
+    }
+  }
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">
+          <h1 className="page-title">
             Welcome{session.user.name ? `, ${session.user.name.split(" ")[0]}` : ""}
           </h1>
-          <p className="text-sm text-zinc-500">Your job application command center</p>
+          <p className="mt-2 text-base font-medium text-zinc-500">
+            Your job application command center
+          </p>
         </div>
         <NotificationBell />
       </div>
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Jobs found" value={jobCount} href="/jobs" />
-        <StatCard label="Applications" value={applicationCount} href="/jobs" />
+      <div className="mb-10 grid gap-4 sm:grid-cols-3">
+        <StatCard label="Jobs found" value={jobCount} />
+        <StatCard label="Applications" value={applicationCount} />
         <StatCard
           label="Auto-apply"
-          value={prefs?.autoApply ? "On" : "Off"}
-          href="/settings"
+          value={preferences.autoApply ? "Yes" : "No"}
         />
       </div>
 
-      <section>
-        <h2 className="mb-4 text-lg font-medium">Recent applications</h2>
-        <ApplicationsList />
-      </section>
+      <DashboardView
+        initialPreferences={preferences}
+        initialLinkedInProfile={linkedInProfile}
+        hasLinkedInAccount={linkedInConnected}
+      />
 
-      <div className="mt-8 flex gap-4 text-sm">
+      <div className="mt-10 flex gap-6 text-base font-bold">
         <Link href="/resume" className="text-zinc-600 underline hover:text-zinc-900">
           Edit resume
         </Link>
         <Link href="/settings" className="text-zinc-600 underline hover:text-zinc-900">
-          Configure settings
-        </Link>
-        <Link href="/jobs" className="text-zinc-600 underline hover:text-zinc-900">
-          View all jobs
+          Advanced settings
         </Link>
       </div>
     </div>
@@ -60,19 +77,14 @@ export default async function DashboardPage() {
 function StatCard({
   label,
   value,
-  href,
 }: {
   label: string;
   value: string | number;
-  href: string;
 }) {
   return (
-    <Link
-      href={href}
-      className="rounded-lg border border-zinc-200 bg-white p-6 transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
-    >
-      <p className="text-sm text-zinc-500">{label}</p>
-      <p className="mt-1 text-3xl font-semibold">{value}</p>
-    </Link>
+    <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+      <p className="card-label">{label}</p>
+      <p className="card-value mt-2">{value}</p>
+    </div>
   );
 }

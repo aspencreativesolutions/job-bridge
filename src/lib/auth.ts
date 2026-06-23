@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import LinkedIn from "next-auth/providers/linkedin";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "./db";
+import { authConfig } from "./auth.config";
 
 export function getLinkedInCredentials() {
   const clientId =
@@ -22,6 +23,7 @@ export function isLinkedInConfigured() {
 const { clientId, clientSecret } = getLinkedInCredentials();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   adapter: PrismaAdapter(db),
   providers: [
     LinkedIn({
@@ -34,15 +36,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id;
-      }
-      return session;
-    },
-  },
-  pages: {
-    signIn: "/login",
-  },
 });

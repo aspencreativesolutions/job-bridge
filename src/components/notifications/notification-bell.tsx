@@ -50,7 +50,7 @@ export function NotificationBell() {
       {open && (
         <div className="absolute right-0 z-50 mt-2 w-80 rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-950">
           <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-            <span className="text-sm font-medium">Notifications</span>
+            <span className="text-base font-bold">Notifications</span>
             {notifications.length > 0 && (
               <button
                 onClick={markAllRead}

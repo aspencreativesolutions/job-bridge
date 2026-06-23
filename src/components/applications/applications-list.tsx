@@ -36,7 +36,7 @@ export function ApplicationsList() {
         <li key={app.id} className="px-6 py-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="font-medium">{app.jobListing.title}</h3>
+              <h3 className="item-title">{app.jobListing.title}</h3>
               <p className="text-sm text-zinc-500">{app.jobListing.company}</p>
             </div>
             <StatusBadge status={app.status} />
