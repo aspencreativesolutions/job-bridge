@@ -1,4 +1,4 @@
-import mapCoords from "./us-map-coords.json";
+import { projectLngLat } from "./map-projection";
 import { parseJobLocation } from "./location";
 
 export interface JobMapMarker {
@@ -8,63 +8,34 @@ export interface JobMapMarker {
   title: string;
   company: string;
   location: string;
+  placeName: string;
   stateCode: string | null;
 }
 
-const cities = mapCoords.cities as unknown as Record<string, [number, number]>;
-const stateCentroids = mapCoords.stateCentroids as unknown as Record<
-  string,
-  [number, number]
->;
-
-function parseCityKey(location: string): string | null {
-  const raw = location.trim();
-  const commaMatch = raw.match(/^([^,]+),\s*([A-Za-z]{2})\b/);
-  if (commaMatch) {
-    return `${commaMatch[1].trim().toLowerCase()}, ${commaMatch[2].toUpperCase()}`.toLowerCase();
-  }
-  return null;
-}
-
-function hashOffset(id: string, index: number): [number, number] {
+/** Tiny spread so overlapping jobs remain visible without crossing state borders. */
+function clusterOffset(id: string, index: number): [number, number] {
   let hash = index * 17;
   for (let i = 0; i < id.length; i++) {
     hash = (hash * 31 + id.charCodeAt(i)) | 0;
   }
   const angle = (hash % 360) * (Math.PI / 180);
-  const radius = 4 + (Math.abs(hash) % 3) * 2;
+  const radius = 1 + (Math.abs(hash) % 2);
   return [Math.cos(angle) * radius, Math.sin(angle) * radius];
 }
 
-function resolveCoords(
-  location: string,
-  stateCode: string | null,
-  id: string,
-  index: number
-): [number, number] | null {
-  const cityKey = parseCityKey(location);
-  if (cityKey && cities[cityKey]) {
-    const [x, y] = cities[cityKey];
-    const [dx, dy] = hashOffset(id, index);
-    return [x + dx, y + dy];
-  }
-
-  if (stateCode && stateCentroids[stateCode]) {
-    const [x, y] = stateCentroids[stateCode];
-    const [dx, dy] = hashOffset(id, index + 1);
-    return [x + dx * 2, y + dy * 2];
-  }
-
-  return null;
+function coordCacheKey(lng: number, lat: number): string {
+  return `${lng.toFixed(4)},${lat.toFixed(4)}`;
 }
 
-export function getJobMapMarkers(
+export function buildJobMapMarkers(
   jobs: {
     id: string;
     title: string;
     company: string;
     location: string | null;
-  }[]
+  }[],
+  geocoded: Map<string, [number, number] | null>,
+  placeNames: Map<string, string | null>
 ): JobMapMarker[] {
   const locationGroups = new Map<string, number>();
 
@@ -73,20 +44,29 @@ export function getJobMapMarkers(
       const parsed = parseJobLocation(job.location);
       if (parsed.isRemote || !job.location?.trim()) return null;
 
-      const groupKey = job.location.trim().toLowerCase();
+      const locationKey = job.location.trim();
+      const lngLat = geocoded.get(locationKey);
+      if (!lngLat) return null;
+
+      const projected = projectLngLat(lngLat[0], lngLat[1]);
+      if (!projected) return null;
+
+      const groupKey = locationKey.toLowerCase();
       const index = locationGroups.get(groupKey) ?? 0;
       locationGroups.set(groupKey, index + 1);
 
-      const coords = resolveCoords(job.location, parsed.stateCode, job.id, index);
-      if (!coords) return null;
+      const [dx, dy] = clusterOffset(job.id, index);
+      const placeName =
+        placeNames.get(coordCacheKey(lngLat[0], lngLat[1])) ?? locationKey;
 
       return {
         id: job.id,
-        x: coords[0],
-        y: coords[1],
+        x: projected[0] + dx,
+        y: projected[1] + dy,
         title: job.title,
         company: job.company,
-        location: job.location,
+        location: locationKey,
+        placeName,
         stateCode: parsed.stateCode,
       };
     })

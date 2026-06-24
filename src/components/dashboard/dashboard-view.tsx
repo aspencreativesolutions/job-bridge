@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { JobPreferencesData, LinkedInProfileData } from "@/lib/types";
 import { parseJobLocation } from "@/lib/jobs/location";
-import { getJobMapMarkers } from "@/lib/jobs/map-markers";
+import type { JobMapMarker } from "@/lib/jobs/map-markers";
 import { ConfigurePreferences } from "./configure-preferences";
 import { ConnectLinkedInGate } from "./connect-linkedin-gate";
 import {
@@ -36,13 +36,21 @@ export function DashboardView({
   const [preferences, setPreferences] =
     useState<JobPreferencesData>(initialPreferences);
   const [jobs, setJobs] = useState<DashboardJob[]>([]);
+  const [mapMarkers, setMapMarkers] = useState<JobMapMarker[]>([]);
   const [mapFocused, setMapFocused] = useState(false);
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
 
   const loadJobs = useCallback(async () => {
-    const res = await fetch("/api/jobs");
-    const data = await res.json();
-    setJobs(data);
+    const [jobsRes, markersRes] = await Promise.all([
+      fetch("/api/jobs"),
+      fetch("/api/jobs/map-markers"),
+    ]);
+    const [jobsData, markersData] = await Promise.all([
+      jobsRes.json(),
+      markersRes.json(),
+    ]);
+    setJobs(jobsData);
+    setMapMarkers(Array.isArray(markersData) ? markersData : []);
   }, []);
 
   useEffect(() => {
@@ -88,7 +96,6 @@ export function DashboardView({
       .catch(() => {});
   }
 
-  const mapMarkers = useMemo(() => getJobMapMarkers(jobs), [jobs]);
   const remoteCount = useMemo(
     () => jobs.filter((j) => parseJobLocation(j.location).isRemote).length,
     [jobs]
@@ -132,28 +139,38 @@ export function DashboardView({
 
   return (
     <div className="relative space-y-5">
-        <div className="dash-box flex shrink-0 flex-col divide-y divide-white/10 sm:flex-row sm:items-center sm:divide-x sm:divide-y-0">
-          <GlassStat
-            icon={<Briefcase className="h-4 w-4 text-cyan-400" />}
-            label="Jobs found"
-            value={String(jobCount)}
-            inline
-          />
-          <GlassStat
-            icon={<Send className="h-4 w-4 text-violet-400" />}
-            label="Applications"
-            value={String(applicationCount)}
-            inline
-          />
-          <AutoApplyToggleCard
-            preferences={preferences}
-            onPreferencesChange={setPreferences}
-            inline
+        <div className="grid gap-5 lg:grid-cols-2 lg:items-stretch">
+          <div className="dash-box flex shrink-0 flex-col divide-y divide-white/10 sm:flex-row sm:items-center sm:divide-x sm:divide-y-0">
+            <GlassStat
+              icon={<Briefcase className="h-3.5 w-3.5 text-cyan-400" />}
+              label="Jobs found"
+              value={String(jobCount)}
+              inline
+              compact
+            />
+            <GlassStat
+              icon={<Send className="h-3.5 w-3.5 text-violet-400" />}
+              label="Applications"
+              value={String(applicationCount)}
+              inline
+              compact
+            />
+            <AutoApplyToggleCard
+              preferences={preferences}
+              onPreferencesChange={setPreferences}
+              inline
+              compact
+            />
+          </div>
+          <LinkedInProfileBox
+            profile={linkedInProfile}
+            onRefresh={setLinkedInProfile}
+            glass
           />
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-2 lg:items-stretch">
-          <div className="dash-box flex min-h-[320px] flex-col p-0 overflow-hidden">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-stretch">
+          <div className="dash-box flex min-h-[260px] flex-col overflow-hidden p-0">
             <div className="flex-1">
               <UsJobMap
                 markers={mapMarkers}
@@ -166,6 +183,7 @@ export function DashboardView({
               />
             </div>
           </div>
+          <CompaniesInFieldBox preferences={preferences} glass />
           <ConfigurePreferences
             preferences={preferences}
             onPreferencesChange={setPreferences}
@@ -174,37 +192,26 @@ export function DashboardView({
           />
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-12">
-          <div className="space-y-5 xl:col-span-7">
-            {selectedMarker && (
-              <div className="dash-box flex items-center gap-2 text-sm text-cyan-200">
-                <MapPin className="h-4 w-4 shrink-0" />
-                Filtering by {selectedMarker.location}
-                <button
-                  type="button"
-                  onClick={() => setSelectedMarkerId(null)}
-                  className="ml-auto rounded p-1 hover:bg-white/10"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
+        <div className="space-y-5">
+          {selectedMarker && (
+            <div className="dash-box flex items-center gap-2 text-sm text-cyan-200">
+              <MapPin className="h-4 w-4 shrink-0" />
+              Filtering by {selectedMarker.location}
+              <button
+                type="button"
+                onClick={() => setSelectedMarkerId(null)}
+                className="ml-auto rounded p-1 hover:bg-white/10"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
 
-            <DashboardJobFeed
-              jobs={filteredJobs}
-              onJobsChange={setJobs}
-              glass
-            />
-          </div>
-
-          <div className="space-y-5 xl:col-span-5">
-            <LinkedInProfileBox
-              profile={linkedInProfile}
-              onRefresh={setLinkedInProfile}
-              glass
-            />
-            <CompaniesInFieldBox preferences={preferences} glass />
-          </div>
+          <DashboardJobFeed
+            jobs={filteredJobs}
+            onJobsChange={setJobs}
+            glass
+          />
         </div>
     </div>
   );
@@ -215,24 +222,42 @@ function GlassStat({
   label,
   value,
   inline = false,
+  compact = false,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   inline?: boolean;
+  compact?: boolean;
 }) {
   return (
     <div
-      className={`flex flex-1 items-center gap-4 ${inline ? "px-4 py-3 sm:py-0" : ""}`}
+      className={`flex flex-1 items-center ${
+        compact ? "gap-2 px-3 py-2" : "gap-4"
+      } ${inline && !compact ? "px-4 py-3 sm:py-0" : ""}`}
     >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5">
+      <div
+        className={`flex shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 ${
+          compact ? "h-8 w-8" : "h-10 w-10"
+        }`}
+      >
         {icon}
       </div>
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+      <div className="min-w-0">
+        <p
+          className={`font-medium uppercase tracking-wide text-slate-400 ${
+            compact ? "text-[10px] leading-tight" : "text-xs"
+          }`}
+        >
           {label}
         </p>
-        <p className="text-2xl font-bold text-white">{value}</p>
+        <p
+          className={`font-bold text-white ${
+            compact ? "text-lg leading-tight" : "text-2xl"
+          }`}
+        >
+          {value}
+        </p>
       </div>
     </div>
   );

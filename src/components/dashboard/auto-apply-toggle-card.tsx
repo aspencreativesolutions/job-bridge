@@ -8,6 +8,7 @@ interface Props {
   onPreferencesChange: (prefs: JobPreferencesData) => void;
   className?: string;
   inline?: boolean;
+  compact?: boolean;
 }
 
 export function AutoApplyToggleCard({
@@ -15,6 +16,7 @@ export function AutoApplyToggleCard({
   onPreferencesChange,
   className = "",
   inline = false,
+  compact = false,
 }: Props) {
   const [saving, setSaving] = useState(false);
 
@@ -31,9 +33,9 @@ export function AutoApplyToggleCard({
       });
       const data = await res.json();
       if (res.ok) onPreferencesChange(data.preferences);
-      else onPreferencesChange({ ...preferences, autoApply: !next });
+      else onPreferencesChange({ ...payload, autoApply: !next });
     } catch {
-      onPreferencesChange({ ...preferences, autoApply: !next });
+      onPreferencesChange({ ...payload, autoApply: !next });
     } finally {
       setSaving(false);
     }
@@ -47,7 +49,9 @@ export function AutoApplyToggleCard({
       aria-label="Auto-apply to matching jobs"
       disabled={saving}
       onClick={() => void handleToggle()}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+      className={`relative shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+        compact ? "h-5 w-9" : "h-7 w-12"
+      } ${
         preferences.autoApply
           ? inline
             ? "bg-cyan-500"
@@ -58,9 +62,15 @@ export function AutoApplyToggleCard({
       }`}
     >
       <span
-        className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-          inline ? "" : "dark:bg-zinc-900"
-        } ${preferences.autoApply ? "translate-x-5" : "translate-x-0"}`}
+        className={`absolute rounded-full bg-white shadow transition-transform ${
+          compact ? "top-0.5 left-0.5 h-4 w-4" : "top-0.5 left-0.5 h-6 w-6"
+        } ${inline ? "" : "dark:bg-zinc-900"} ${
+          preferences.autoApply
+            ? compact
+              ? "translate-x-4"
+              : "translate-x-5"
+            : "translate-x-0"
+        }`}
       />
     </button>
   );
@@ -68,9 +78,15 @@ export function AutoApplyToggleCard({
   if (inline) {
     return (
       <div
-        className={`flex flex-1 items-center justify-between gap-4 px-4 py-3 sm:py-0 ${className}`}
+        className={`flex flex-1 items-center justify-between gap-2 ${
+          compact ? "px-3 py-2" : "gap-4 px-4 py-3 sm:py-0"
+        } ${className}`}
       >
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+        <p
+          className={`font-medium uppercase tracking-wide text-slate-400 ${
+            compact ? "text-[10px] leading-tight" : "text-xs"
+          }`}
+        >
           Auto-apply
         </p>
         {toggleButton}

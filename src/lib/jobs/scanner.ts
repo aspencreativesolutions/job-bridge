@@ -1,5 +1,7 @@
 import { db } from "../db";
 import type { JobPreferencesData } from "../types";
+import { getLinkedInJobSource } from "../linkedin/api-capabilities";
+import { enrichGuestJobWithDetails } from "../linkedin/guest-jobs";
 import { jobMatchesSalary } from "./match";
 
 export function parseJobPreferences(raw: {
@@ -57,8 +59,16 @@ export async function scanJobsForUser(userId: string): Promise<{
   const prefs = await getOrCreateJobPreferences(userId);
   const preferences = parseJobPreferences(prefs);
 
+  if (getLinkedInJobSource() !== "mock") {
+    await purgeMockJobListings(userId);
+  }
+
   const accessToken = await getLinkedInAccessToken(userId);
-  const jobs = await searchLinkedInJobs(accessToken, preferences);
+  const profileTitles = await getProfileTitlesForUser(userId);
+
+  const jobs = await searchLinkedInJobs(accessToken, preferences, {
+    profileTitles,
+  });
 
   let newJobs = 0;
   let applicationsCreated = 0;
@@ -74,18 +84,26 @@ export async function scanJobsForUser(userId: string): Promise<{
 
     if (existing) continue;
 
+    const enrichedJob =
+      getLinkedInJobSource() === "guest" &&
+      job.externalId.startsWith("li-guest-")
+        ? await enrichGuestJobWithDetails(job)
+        : job;
+
+    if (!jobMatchesSalary(enrichedJob, preferences)) continue;
+
     const listing = await db.jobListing.create({
       data: {
         userId,
-        externalId: job.externalId,
-        title: job.title,
-        company: job.company,
-        location: job.location,
-        description: job.description,
-        salaryMin: job.salaryMin,
-        salaryMax: job.salaryMax,
-        url: job.url,
-        postedAt: job.postedAt,
+        externalId: enrichedJob.externalId,
+        title: enrichedJob.title,
+        company: enrichedJob.company,
+        location: enrichedJob.location,
+        description: enrichedJob.description,
+        salaryMin: enrichedJob.salaryMin,
+        salaryMax: enrichedJob.salaryMax,
+        url: enrichedJob.url,
+        postedAt: enrichedJob.postedAt,
         isNew: true,
       },
     });
@@ -96,7 +114,7 @@ export async function scanJobsForUser(userId: string): Promise<{
       await createNotification(userId, {
         type: "new_job",
         title: "New job match",
-        message: `${job.title} at ${job.company}`,
+        message: `${enrichedJob.title} at ${enrichedJob.company}`,
         metadata: { jobListingId: listing.id },
       });
     }
@@ -105,7 +123,7 @@ export async function scanJobsForUser(userId: string): Promise<{
       const { sendJobAlertEmail } = await import("../notifications/email");
       const user = await db.user.findUnique({ where: { id: userId } });
       if (user?.email) {
-        await sendJobAlertEmail(user.email, job);
+        await sendJobAlertEmail(user.email, enrichedJob);
       }
     }
 
@@ -153,4 +171,31 @@ export async function scanAllUsers(): Promise<{
   }
 
   return { usersScanned, totalNewJobs };
+}
+
+async function getProfileTitlesForUser(userId: string): Promise<string[]> {
+  const record = await db.linkedInProfile.findUnique({
+    where: { userId },
+    select: { experience: true },
+  });
+  if (!record) return [];
+
+  try {
+    const experience = JSON.parse(record.experience) as { title: string }[];
+    return experience.map((e) => e.title).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+async function purgeMockJobListings(userId: string): Promise<void> {
+  await db.jobListing.deleteMany({
+    where: {
+      userId,
+      OR: [
+        { externalId: { startsWith: "mock-" } },
+        { url: { contains: "/jobs/view/mock-" } },
+      ],
+    },
+  });
 }

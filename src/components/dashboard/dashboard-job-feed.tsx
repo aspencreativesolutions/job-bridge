@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { Send, ExternalLink, CheckCircle2, X } from "lucide-react";
 import { parseJobLocation } from "@/lib/jobs/location";
+import { formatJobPostedDate } from "@/lib/jobs/format-date";
+import { JobSalary } from "@/components/jobs/job-salary";
 
 interface JobApplication {
   id: string;
@@ -17,6 +19,8 @@ export interface DashboardJob {
   url: string | null;
   salaryMin: number | null;
   salaryMax: number | null;
+  postedAt: string | null;
+  discoveredAt: string;
   isNew: boolean;
   applications: JobApplication[];
 }
@@ -25,19 +29,6 @@ interface Props {
   jobs?: DashboardJob[];
   onJobsChange?: (jobs: DashboardJob[]) => void;
   glass?: boolean;
-}
-
-function formatSalaryRange(min: number | null, max: number | null): string | null {
-  if (min == null && max == null) return null;
-  const fmt = (n: number) =>
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-    }).format(n);
-  if (min != null && max != null) return `${fmt(min)} – ${fmt(max)} / yr`;
-  if (min != null) return `From ${fmt(min)} / yr`;
-  return `Up to ${fmt(max!)} / yr`;
 }
 
 function isApplied(job: DashboardJob): boolean {
@@ -236,17 +227,21 @@ function JobSection({
       {jobs.length === 0 ? (
         <p className={emptyClass}>{emptyText}</p>
       ) : (
-        <ul className="space-y-3">
+        <div className="max-h-80 overflow-y-auto pr-1">
+          <ul className="space-y-3">
           {jobs.map((job) => {
-            const salary = formatSalaryRange(job.salaryMin, job.salaryMax);
             const { stateCode } = parseJobLocation(job.location);
+            const postedLabel = formatJobPostedDate(
+              job.postedAt,
+              job.discoveredAt
+            );
             const itemClass = glass
               ? "dash-box-sm flex flex-wrap items-center justify-between gap-4"
               : "flex flex-wrap items-center justify-between gap-4 rounded-lg border border-zinc-200 px-6 py-4 dark:border-zinc-800";
             return (
               <li key={job.id} className={itemClass}>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h3
                       className={
                         glass ? "text-lg font-bold text-white" : "item-title"
@@ -254,24 +249,29 @@ function JobSection({
                     >
                       {job.title}
                     </h3>
-                    {job.isNew && (
+                    {postedLabel && (
                       <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-xs font-bold text-cyan-300">
-                        New
+                        {postedLabel}
                       </span>
                     )}
+                    <JobSalary
+                      salaryMin={job.salaryMin}
+                      salaryMax={job.salaryMax}
+                      variant={glass ? "glass" : "default"}
+                    />
                   </div>
                   <p className={metaClass}>
                     {job.company}
                     {job.location ? ` · ${job.location}` : ""}
                     {stateCode && glass ? ` (${stateCode})` : ""}
-                    {salary ? ` · ${salary}` : ""}
                   </p>
                 </div>
                 {renderAction(job)}
               </li>
             );
           })}
-        </ul>
+          </ul>
+        </div>
       )}
     </section>
   );

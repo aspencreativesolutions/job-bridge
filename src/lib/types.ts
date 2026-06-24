@@ -42,6 +42,7 @@ export interface LinkedInProfileData {
   jobPreferences: LinkedInJobPreference[];
   profileCompleteness: number;
   profileUrl: string | null;
+  profilePictureUrl: string | null;
   warnings: string[];
   connectedAt: string;
   fetchedAt: string;

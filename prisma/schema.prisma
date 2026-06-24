@@ -171,6 +171,7 @@ model LinkedInProfile {
   jobPreferences      String   @default("[]") // JSON array of { title, location }
   profileCompleteness Int      @default(0) // 0-100
   profileUrl          String?
+  profilePictureUrl   String?
   warnings            String?  // JSON array of API limitation messages
   rawData             String?  // JSON snapshot from API
   connectedAt         DateTime @default(now())

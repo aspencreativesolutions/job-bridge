@@ -69,12 +69,16 @@ export function LinkedInProfileBox({ profile, onRefresh, glass }: Props) {
           type="button"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
-          className="flex min-w-0 flex-1 items-start gap-2 text-left"
+          className="flex min-w-0 flex-1 items-start gap-3 text-left"
         >
           <ChevronDown
-            className={`mt-1 h-4 w-4 shrink-0 text-slate-400 transition-transform ${
+            className={`mt-3 h-4 w-4 shrink-0 text-slate-400 transition-transform ${
               expanded ? "rotate-180" : ""
             }`}
+          />
+          <ProfileAvatar
+            pictureUrl={profile.profilePictureUrl}
+            glass={glass}
           />
           <div className="min-w-0">
             <h2 className={titleText}>LinkedIn Profile</h2>
@@ -285,6 +289,38 @@ export function LinkedInProfileBox({ profile, onRefresh, glass }: Props) {
         </>
       )}
     </section>
+  );
+}
+
+function ProfileAvatar({
+  pictureUrl,
+  glass,
+}: {
+  pictureUrl: string | null;
+  glass?: boolean;
+}) {
+  const ring = glass
+    ? "ring-slate-600/60 bg-slate-700/50 text-slate-400"
+    : "ring-emerald-200 bg-emerald-100 text-emerald-700 dark:ring-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300";
+
+  if (pictureUrl) {
+    return (
+      <img
+        src={pictureUrl}
+        alt="LinkedIn profile"
+        referrerPolicy="no-referrer"
+        className={`mt-0.5 h-11 w-11 shrink-0 rounded-full object-cover ring-2 ${ring}`}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full ring-2 ${ring}`}
+      aria-hidden
+    >
+      <User className="h-5 w-5" />
+    </div>
   );
 }
 

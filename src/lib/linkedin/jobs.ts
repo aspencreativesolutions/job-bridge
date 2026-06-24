@@ -1,5 +1,12 @@
 import type { LinkedInJob, JobPreferencesData } from "../types";
 import { jobMatchesSalary } from "../jobs/match";
+import { getLinkedInJobSource } from "./api-capabilities";
+import { searchGuestJobsForPreferences } from "./guest-jobs";
+import {
+  buildJobSearchKeywords,
+  mergeKeywords,
+} from "./positions";
+import { withLinkedInRateLimit } from "./rate-limit";
 
 const LINKEDIN_JOBS_API = "https://api.linkedin.com/v2/jobSearch";
 
@@ -10,6 +17,10 @@ const MOCK_SALARIES = [
   { min: 120000, max: 160000 },
   { min: 140000, max: 190000 },
 ];
+
+export interface JobSearchOptions {
+  profileTitles?: string[];
+}
 
 export async function getLinkedInAccessToken(
   userId: string
@@ -23,37 +34,70 @@ export async function getLinkedInAccessToken(
 
 export async function searchLinkedInJobs(
   accessToken: string | null,
-  preferences: JobPreferencesData
+  preferences: JobPreferencesData,
+  options: JobSearchOptions = {}
 ): Promise<LinkedInJob[]> {
-  if (process.env.USE_MOCK_JOBS === "true" || !accessToken) {
-    return mockJobSearch(preferences);
+  const source = getLinkedInJobSource();
+
+  if (source === "mock") {
+    return mockJobSearch(preferences, options.profileTitles);
+  }
+
+  const titles = buildJobSearchKeywords(preferences, options.profileTitles);
+  const keywords = mergeKeywords(titles, preferences.keywords);
+
+  if (source === "official" && accessToken) {
+    const official = await searchOfficialJobs(accessToken, keywords, preferences);
+    if (official.length > 0) return official;
   }
 
   try {
-    const keywords = [
-      ...preferences.jobTitles,
-      ...preferences.keywords,
-    ].join(" ");
-
-    const params = new URLSearchParams({
-      keywords,
-      count: "25",
+    const jobs = await searchGuestJobsForPreferences({
+      keywords: titles,
+      locations: preferences.locations,
     });
 
+    if (jobs.length > 0) {
+      return jobs.filter((job) => jobMatchesSalary(job, preferences));
+    }
+
+    console.warn(
+      "Guest job search returned 0 results for keywords:",
+      titles.join(", ")
+    );
+  } catch (error) {
+    console.warn("Guest job search failed:", error);
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    console.warn("Falling back to mock jobs — check guest API connectivity");
+  }
+  return mockJobSearch(preferences, options.profileTitles);
+}
+
+async function searchOfficialJobs(
+  accessToken: string,
+  keywords: string,
+  preferences: JobPreferencesData
+): Promise<LinkedInJob[]> {
+  try {
+    const params = new URLSearchParams({ keywords, count: "25" });
     if (preferences.locations.length > 0) {
       params.set("location", preferences.locations[0]);
     }
 
-    const response = await fetch(`${LINKEDIN_JOBS_API}?${params}`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "X-Restli-Protocol-Version": "2.0.0",
-      },
-    });
+    const response = await withLinkedInRateLimit(() =>
+      fetch(`${LINKEDIN_JOBS_API}?${params}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "X-Restli-Protocol-Version": "2.0.0",
+        },
+      })
+    );
 
     if (!response.ok) {
-      console.warn("LinkedIn API error, falling back to mock:", response.status);
-      return mockJobSearch(preferences);
+      console.warn("LinkedIn official job API unavailable:", response.status);
+      return [];
     }
 
     const data = await response.json();
@@ -61,8 +105,8 @@ export async function searchLinkedInJobs(
       jobMatchesSalary(job, preferences)
     );
   } catch (error) {
-    console.warn("LinkedIn job search failed, using mock:", error);
-    return mockJobSearch(preferences);
+    console.warn("LinkedIn official job search failed:", error);
+    return [];
   }
 }
 
@@ -82,11 +126,11 @@ function parseLinkedInResponse(data: unknown): LinkedInJob[] {
   });
 }
 
-function mockJobSearch(preferences: JobPreferencesData): LinkedInJob[] {
-  const titles =
-    preferences.jobTitles.length > 0
-      ? preferences.jobTitles
-      : ["Software Engineer"];
+function mockJobSearch(
+  preferences: JobPreferencesData,
+  profileTitles: string[] = []
+): LinkedInJob[] {
+  const titles = buildJobSearchKeywords(preferences, profileTitles);
 
   const industries =
     preferences.industries.length > 0
@@ -143,13 +187,3 @@ function mockJobSearch(preferences: JobPreferencesData): LinkedInJob[] {
 
   return jobs.filter((job) => jobMatchesSalary(job, preferences));
 }
-
-function formatSalary(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-export { formatSalary };

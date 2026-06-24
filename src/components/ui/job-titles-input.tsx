@@ -7,46 +7,41 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  getCrossIndustryTooltip,
+  type JobTitleSuggestion,
+} from "@/lib/jobs/job-titles";
+import { CrossIndustryTag } from "@/components/ui/cross-industry-tag";
 
 interface Props {
   value: string;
   onChange: (value: string) => void;
+  onAddTitle: () => void;
   placeholder?: string;
   className?: string;
   inputClassName?: string;
-}
-
-function getCurrentSegment(value: string): string {
-  const lastComma = value.lastIndexOf(",");
-  const segment = lastComma === -1 ? value : value.slice(lastComma + 1);
-  return segment.trimStart();
-}
-
-function applySuggestion(value: string, suggestion: string): string {
-  const lastComma = value.lastIndexOf(",");
-  if (lastComma === -1) {
-    return suggestion;
-  }
-  return `${value.slice(0, lastComma + 1)} ${suggestion}`;
+  glass?: boolean;
 }
 
 export function JobTitlesInput({
   value,
   onChange,
-  placeholder = "Software Engineer, Product Manager",
+  onAddTitle,
+  placeholder = "Software Engineer",
   className = "",
   inputClassName = "",
+  glass = false,
 }: Props) {
   const listboxId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [open, setOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<JobTitleSuggestion[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const currentQuery = getCurrentSegment(value);
+  const currentQuery = value.trim();
 
   const fetchSuggestions = useCallback(async (query: string) => {
     if (!query.trim()) {
@@ -61,7 +56,7 @@ export function JobTitlesInput({
         `/api/job-titles?q=${encodeURIComponent(query)}&limit=8`
       );
       const data = await res.json();
-      const results = (data.results ?? []) as string[];
+      const results = (data.results ?? []) as JobTitleSuggestion[];
       setSuggestions(results);
       setActiveIndex(0);
       setOpen(true);
@@ -92,15 +87,34 @@ export function JobTitlesInput({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  function selectSuggestion(suggestion: string) {
-    const next = applySuggestion(value, suggestion);
-    onChange(next.endsWith(", ") ? next : `${next}, `);
+  function selectSuggestion(suggestion: JobTitleSuggestion) {
+    onChange(suggestion.title);
     setOpen(false);
     setSuggestions([]);
     inputRef.current?.focus();
   }
 
+  function handleAdd() {
+    if (!value.trim()) return;
+    onAddTitle();
+    setOpen(false);
+    inputRef.current?.focus();
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      if (open && suggestions[activeIndex]) {
+        e.preventDefault();
+        selectSuggestion(suggestions[activeIndex]);
+        return;
+      }
+      if (value.trim()) {
+        e.preventDefault();
+        handleAdd();
+      }
+      return;
+    }
+
     if (!open || suggestions.length === 0) {
       if (e.key === "Escape") setOpen(false);
       return;
@@ -117,12 +131,6 @@ export function JobTitlesInput({
           (i) => (i - 1 + suggestions.length) % suggestions.length
         );
         break;
-      case "Enter":
-        if (open && suggestions[activeIndex]) {
-          e.preventDefault();
-          selectSuggestion(suggestions[activeIndex]);
-        }
-        break;
       case "Escape":
         e.preventDefault();
         setOpen(false);
@@ -136,60 +144,105 @@ export function JobTitlesInput({
   const showDropdown =
     open && currentQuery.length > 0 && (suggestions.length > 0 || !loading);
 
+  const wrapperClass = glass
+    ? "border border-slate-600/60 bg-slate-700/50 focus-within:border-violet-400/60 focus-within:ring-1 focus-within:ring-violet-400/30"
+    : "border border-indigo-200 bg-white focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-200 dark:border-indigo-700 dark:bg-indigo-950 dark:focus-within:border-indigo-500 dark:focus-within:ring-indigo-900";
+
+  const dropdownClass = glass
+    ? "border border-slate-600/60 bg-slate-800 py-1 shadow-lg ring-1 ring-white/5"
+    : "border border-indigo-200 bg-white py-1 shadow-lg ring-1 ring-indigo-100 dark:border-indigo-700 dark:bg-indigo-950 dark:ring-indigo-900";
+
+  const activeItemClass = glass
+    ? "bg-violet-500/20 text-white"
+    : "bg-indigo-100 text-indigo-900 dark:bg-indigo-900 dark:text-indigo-100";
+
+  const itemClass = glass
+    ? "text-slate-200 hover:bg-white/5"
+    : "text-zinc-800 hover:bg-indigo-50 dark:text-zinc-200 dark:hover:bg-indigo-900/50";
+
+  const buttonClass = glass
+    ? "shrink-0 border-l border-slate-600/60 bg-violet-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
+    : "shrink-0 border-l border-indigo-200 bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400";
+
   return (
     <div ref={containerRef} className={`relative ${className}`}>
-      <input
-        ref={inputRef}
-        type="text"
-        role="combobox"
-        aria-expanded={showDropdown}
-        aria-controls={listboxId}
-        aria-autocomplete="list"
-        aria-activedescendant={
-          showDropdown && suggestions[activeIndex]
-            ? `${listboxId}-option-${activeIndex}`
-            : undefined
-        }
-        className={inputClassName}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => {
-          if (currentQuery && suggestions.length > 0) setOpen(true);
-        }}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        autoComplete="off"
-      />
+      <div
+        className={`flex items-stretch overflow-hidden rounded-md ${wrapperClass}`}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          role="combobox"
+          aria-expanded={showDropdown}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            showDropdown && suggestions[activeIndex]
+              ? `${listboxId}-option-${activeIndex}`
+              : undefined
+          }
+          className={`min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm outline-none focus:ring-0 ${
+            glass
+              ? "text-white placeholder:text-slate-500"
+              : "text-zinc-900 placeholder:text-zinc-400 dark:text-zinc-100"
+          } ${inputClassName}`}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => {
+            if (currentQuery && suggestions.length > 0) setOpen(true);
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          autoComplete="off"
+        />
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={!value.trim()}
+          className={buttonClass}
+        >
+          Add Title
+        </button>
+      </div>
 
       {showDropdown && (
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-md border border-indigo-200 bg-white py-1 shadow-lg ring-1 ring-indigo-100 dark:border-indigo-700 dark:bg-indigo-950 dark:ring-indigo-900"
+          className={`absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-md ${dropdownClass}`}
         >
           {suggestions.length > 0 ? (
-            suggestions.map((title, index) => (
+            suggestions.map((suggestion, index) => (
               <li
-                key={title}
+                key={suggestion.title}
                 id={`${listboxId}-option-${index}`}
                 role="option"
                 aria-selected={index === activeIndex}
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  selectSuggestion(title);
+                  selectSuggestion(suggestion);
                 }}
                 onMouseEnter={() => setActiveIndex(index)}
-                className={`cursor-pointer px-3 py-2 text-sm ${
-                  index === activeIndex
-                    ? "bg-indigo-100 text-indigo-900 dark:bg-indigo-900 dark:text-indigo-100"
-                    : "text-zinc-800 hover:bg-indigo-50 dark:text-zinc-200 dark:hover:bg-indigo-900/50"
+                className={`flex cursor-pointer items-center gap-2 px-3 py-2 text-sm ${
+                  index === activeIndex ? activeItemClass : itemClass
                 }`}
               >
-                {title}
+                <span className="min-w-0 flex-1 truncate">{suggestion.title}</span>
+                {suggestion.crossIndustry && (
+                  <CrossIndustryTag
+                    glass={glass}
+                    showTooltip
+                    tooltip={getCrossIndustryTooltip(suggestion.title)}
+                  />
+                )}
               </li>
             ))
           ) : (
-            <li className="px-3 py-2 text-sm italic text-zinc-500 dark:text-zinc-400">
+            <li
+              className={`px-3 py-2 text-sm italic ${
+                glass ? "text-slate-500" : "text-zinc-500 dark:text-zinc-400"
+              }`}
+            >
               No matches — continue typing your custom title
             </li>
           )}

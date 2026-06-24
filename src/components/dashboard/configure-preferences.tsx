@@ -1,11 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { Save, RefreshCw } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Save, RefreshCw, X } from "lucide-react";
 import type { JobPreferencesData } from "@/lib/types";
 import { INDUSTRY_OPTIONS } from "@/lib/types";
+import {
+  getCrossIndustryContext,
+  getCrossIndustryTooltip,
+  getTitleMetadata,
+  type IndustryOption,
+} from "@/lib/jobs/job-titles";
 import { JobTitlesInput } from "@/components/ui/job-titles-input";
 import { SalaryRangeSelect } from "@/components/ui/salary-range-select";
+import { CrossIndustryTag } from "@/components/ui/cross-industry-tag";
 
 interface Props {
   preferences: JobPreferencesData;
@@ -20,11 +27,69 @@ export function ConfigurePreferences({
   onSaved,
   glass,
 }: Props) {
-  const [jobTitleInput, setJobTitleInput] = useState(
-    preferences.jobTitles.join(", ")
-  );
+  const [jobTitleDraft, setJobTitleDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+
+  const crossIndustry = useMemo(
+    () => getCrossIndustryContext(preferences.jobTitles),
+    [preferences.jobTitles]
+  );
+
+  const industryOptions = crossIndustry.hasCrossIndustry
+    ? crossIndustry.relevantIndustries
+    : [...INDUSTRY_OPTIONS];
+
+  const preferredIndustry =
+    preferences.industries.find((i) =>
+      (industryOptions as readonly string[]).includes(i)
+    ) ?? "";
+
+  function updateJobTitles(jobTitles: string[]) {
+    const ctx = getCrossIndustryContext(jobTitles);
+    const industries = ctx.hasCrossIndustry
+      ? preferences.industries.filter((i) =>
+          ctx.relevantIndustries.includes(i as IndustryOption)
+        )
+      : preferences.industries;
+    const next = { ...preferences, jobTitles, industries };
+    onPreferencesChange(next);
+    void persistJobTitles(next);
+  }
+
+  async function persistJobTitles(next: JobPreferencesData) {
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: next, refreshJobs: false }),
+      });
+      const data = await res.json();
+      if (res.ok) onPreferencesChange(data.preferences);
+    } catch {
+      // Keep optimistic local state if save fails.
+    }
+  }
+
+  function addTitle() {
+    const title = jobTitleDraft.trim();
+    if (!title) return;
+
+    const exists = preferences.jobTitles.some(
+      (t) => t.toLowerCase() === title.toLowerCase()
+    );
+    if (exists) {
+      setJobTitleDraft("");
+      return;
+    }
+
+    updateJobTitles([...preferences.jobTitles, title]);
+    setJobTitleDraft("");
+  }
+
+  function removeTitle(title: string) {
+    updateJobTitles(preferences.jobTitles.filter((t) => t !== title));
+  }
 
   function toggleIndustry(industry: string) {
     onPreferencesChange({
@@ -35,21 +100,22 @@ export function ConfigurePreferences({
     });
   }
 
+  function setPreferredIndustry(industry: string) {
+    onPreferencesChange({
+      ...preferences,
+      industries: industry ? [industry] : [],
+    });
+  }
+
   async function saveAndRefresh() {
     setSaving(true);
     setMessage("");
-    const jobTitles = jobTitleInput
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    const payload = { ...preferences, jobTitles };
 
     try {
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preferences: payload, refreshJobs: true }),
+        body: JSON.stringify({ preferences, refreshJobs: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error("Save failed");
@@ -88,12 +154,20 @@ export function ConfigurePreferences({
     ? "text-xs text-slate-500"
     : "text-xs text-indigo-600/70 dark:text-indigo-400/70";
   const inputClass = glass
-    ? "w-full rounded-md border border-slate-600/60 bg-slate-700/50 px-3 py-2 text-sm text-white placeholder:text-slate-500"
-    : "w-full rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-indigo-700 dark:bg-indigo-950 dark:text-zinc-100";
+    ? "text-white placeholder:text-slate-500"
+    : "text-zinc-900 dark:text-zinc-100";
+
+  const listContainerClass = glass
+    ? "rounded-lg border border-slate-600/50 bg-slate-800/40 p-4"
+    : "rounded-lg border border-indigo-200 bg-white/60 p-4 dark:border-indigo-800 dark:bg-indigo-950/40";
+
+  const listItemClass = glass
+    ? "flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
+    : "flex items-center gap-2 rounded-md border border-indigo-100 bg-white px-3 py-2 text-sm text-indigo-950 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-50";
 
   return (
     <section className={outer}>
-      <h2 className={titleText}>Configure Preferences</h2>
+      <h2 className={titleText}>Preferences</h2>
       <p className={`mt-1 ${subText}`}>
         Set your job search criteria. Saving refreshes your job feed.
       </p>
@@ -111,22 +185,96 @@ export function ConfigurePreferences({
       )}
 
       <div className={divider}>
-        <label className={`mb-1.5 block ${labelText}`}>Job titles</label>
-        <JobTitlesInput
-          value={jobTitleInput}
-          onChange={(value) => {
-            setJobTitleInput(value);
-            const jobTitles = value
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean);
-            onPreferencesChange({ ...preferences, jobTitles });
-          }}
-          inputClassName={inputClass}
-        />
-        <p className={`mt-1 ${hintText}`}>
-          Comma-separated — type to see suggestions, or enter a custom title
-        </p>
+        <div className="mb-4 grid grid-cols-1 items-start gap-3">
+          <div className={`${listContainerClass} space-y-3`}>
+            <div>
+              <p className={labelText}>Your Position</p>
+              <p className={`mt-0.5 ${hintText}`}>
+                Positions you&apos;re actively searching for
+              </p>
+            </div>
+            {preferences.jobTitles.length === 0 ? (
+              <p className={`text-sm ${hintText}`}>
+                No titles added yet. Add a role below to build your search list.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {preferences.jobTitles.map((title) => {
+                  const { crossIndustry: isCrossIndustry } =
+                    getTitleMetadata(title);
+                  return (
+                    <li key={title} className={listItemClass}>
+                      <span className="min-w-0 font-medium">{title}</span>
+                      {isCrossIndustry && (
+                        <CrossIndustryTag
+                          glass={glass}
+                          showTooltip
+                          tooltip={getCrossIndustryTooltip(title)}
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeTitle(title)}
+                        className={`shrink-0 rounded p-1 transition ${
+                          glass
+                            ? "text-slate-400 hover:bg-white/10 hover:text-white"
+                            : "text-indigo-400 hover:bg-indigo-50 hover:text-indigo-700 dark:hover:bg-indigo-900 dark:hover:text-indigo-200"
+                        }`}
+                        aria-label={`Remove ${title}`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <div className="border-t border-slate-600/40 pt-3">
+              <label className={`mb-1.5 block ${labelText}`}>Add a job title</label>
+              <JobTitlesInput
+                value={jobTitleDraft}
+                onChange={setJobTitleDraft}
+                onAddTitle={addTitle}
+                inputClassName={inputClass}
+                glass={glass}
+              />
+              <p className={`mt-1 ${hintText}`}>
+                Type a role, pick a suggestion, then click Add Title or press Enter
+              </p>
+            </div>
+          </div>
+
+          {crossIndustry.hasCrossIndustry && (
+            <div className={`${listContainerClass} space-y-2`}>
+              <div>
+                <label htmlFor="preferred-industry" className={labelText}>
+                  Desired Industry
+                </label>
+              </div>
+              <select
+                id="preferred-industry"
+                value={preferredIndustry}
+                onChange={(e) => setPreferredIndustry(e.target.value)}
+                className={
+                  glass
+                    ? "w-full rounded-md border border-slate-600/60 bg-slate-700/50 px-3 py-2 text-sm text-white"
+                    : "w-full rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-indigo-700 dark:bg-indigo-950 dark:text-zinc-100"
+                }
+              >
+                  <option value="">Select an industry for your role…</option>
+                  {industryOptions.map((industry) => (
+                    <option key={industry} value={industry}>
+                      {industry}
+                    </option>
+                  ))}
+                </select>
+              <p className={hintText}>
+                Options are tailored to your selected cross-industry role
+                {crossIndustry.categories.length > 1 ? "s" : ""}.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className={divider}>
@@ -137,14 +285,20 @@ export function ConfigurePreferences({
           onChange={(salaryMin, salaryMax) =>
             onPreferencesChange({ ...preferences, salaryMin, salaryMax })
           }
-          className={inputClass}
+          className={
+            glass
+              ? "w-full rounded-md border border-slate-600/60 bg-slate-700/50 px-3 py-2 text-sm text-white"
+              : "w-full rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-indigo-700 dark:bg-indigo-950 dark:text-zinc-100"
+          }
         />
       </div>
 
       <div className={divider}>
-        <label className={`mb-2 block ${labelText}`}>Industries</label>
+        <label className={`mb-2 block ${labelText}`}>
+          {crossIndustry.hasCrossIndustry ? "Related industries" : "Industries"}
+        </label>
         <div className="flex flex-wrap gap-1.5">
-          {INDUSTRY_OPTIONS.map((industry) => {
+          {industryOptions.map((industry) => {
             const selected = preferences.industries.includes(industry);
             return (
               <button

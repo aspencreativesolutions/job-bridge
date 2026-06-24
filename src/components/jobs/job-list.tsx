@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { RefreshCw, Send, ExternalLink } from "lucide-react";
+import { formatJobPostedDate } from "@/lib/jobs/format-date";
+import { JobSalary } from "@/components/jobs/job-salary";
 
 interface Job {
   id: string;
@@ -9,6 +11,9 @@ interface Job {
   company: string;
   location: string | null;
   url: string | null;
+  salaryMin: number | null;
+  salaryMax: number | null;
+  postedAt: string | null;
   isNew: boolean;
   discoveredAt: string;
   applications: { id: string; status: string }[];
@@ -89,22 +94,28 @@ export function JobList() {
           No jobs yet. Configure filters in Settings and run a scan.
         </p>
       ) : (
-        <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+        <div className="max-h-80 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+          <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
           {jobs.map((job) => {
             const applied = job.applications.length > 0;
+            const postedLabel = formatJobPostedDate(
+              job.postedAt,
+              job.discoveredAt
+            );
             return (
               <li
                 key={job.id}
                 className="flex flex-wrap items-center justify-between gap-4 px-6 py-4"
               >
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h3 className="item-title">{job.title}</h3>
-                    {job.isNew && (
+                    {postedLabel && (
                       <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                        New
+                        {postedLabel}
                       </span>
                     )}
+                    <JobSalary salaryMin={job.salaryMin} salaryMax={job.salaryMax} />
                   </div>
                   <p className="text-sm text-zinc-500">
                     {job.company}
@@ -139,7 +150,8 @@ export function JobList() {
               </li>
             );
           })}
-        </ul>
+          </ul>
+        </div>
       )}
     </div>
   );

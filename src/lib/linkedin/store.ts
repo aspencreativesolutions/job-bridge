@@ -6,6 +6,8 @@ import {
   parseLinkedInProfileRecord,
 } from "./profile";
 import { getLinkedInAccessToken } from "./jobs";
+import { extractJobTitlesFromProfile } from "./positions";
+import { parseJobPreferences } from "../jobs/scanner";
 
 export async function getLinkedInProfileForUser(
   userId: string
@@ -61,6 +63,7 @@ export async function connectLinkedInProfile(
       jobPreferences: JSON.stringify(profile.jobPreferences),
       profileCompleteness,
       profileUrl: profile.profileUrl,
+      profilePictureUrl: profile.profilePictureUrl,
       warnings: JSON.stringify(warnings.length ? warnings : profile.warnings),
       rawData: JSON.stringify(raw),
       connectedAt: now,
@@ -74,13 +77,36 @@ export async function connectLinkedInProfile(
       jobPreferences: JSON.stringify(profile.jobPreferences),
       profileCompleteness,
       profileUrl: profile.profileUrl,
+      profilePictureUrl: profile.profilePictureUrl,
       warnings: JSON.stringify(warnings.length ? warnings : profile.warnings),
       rawData: JSON.stringify(raw),
       fetchedAt: now,
     },
   });
 
-  return parseLinkedInProfileRecord(record);
+  const parsed = parseLinkedInProfileRecord(record);
+  await seedJobTitlesFromProfile(userId, parsed);
+
+  return parsed;
+}
+
+async function seedJobTitlesFromProfile(
+  userId: string,
+  profile: LinkedInProfileData
+): Promise<void> {
+  const prefs = await db.jobPreference.findUnique({ where: { userId } });
+  if (!prefs) return;
+
+  const existing = parseJobPreferences(prefs).jobTitles;
+  if (existing.length > 0) return;
+
+  const titles = extractJobTitlesFromProfile(profile);
+  if (titles.length === 0) return;
+
+  await db.jobPreference.update({
+    where: { userId },
+    data: { jobTitles: JSON.stringify(titles) },
+  });
 }
 
 export async function hasLinkedInAccount(userId: string): Promise<boolean> {

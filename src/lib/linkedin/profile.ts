@@ -32,6 +32,7 @@ export async function fetchLinkedInProfileMetadata(
   let education: LinkedInEducation[] = [];
   let jobPreferences: LinkedInJobPreference[] = [];
   let profileUrl: string | null = null;
+  let profilePictureUrl: string | null = null;
 
   const identityResult = await linkedInGet(LINKEDIN_REST_IDENTITY, accessToken, {
     "Linkedin-Version": LINKEDIN_API_VERSION,
@@ -44,6 +45,7 @@ export async function fetchLinkedInProfileMetadata(
     experience = parsed.experience;
     education = parsed.education;
     profileUrl = parsed.profileUrl;
+    profilePictureUrl = parsed.profilePictureUrl;
   } else if (identityResult.status === 403) {
     if (!hasVerifiedProfileScopes()) {
       warnings.push(
@@ -64,6 +66,9 @@ export async function fetchLinkedInProfileMetadata(
     const parsed = parseUserinfo(userinfoResult.data);
     if (!profileUrl && parsed.profileUrl) profileUrl = parsed.profileUrl;
     if (!headline && parsed.headline) headline = parsed.headline;
+    if (!profilePictureUrl && parsed.profilePictureUrl) {
+      profilePictureUrl = parsed.profilePictureUrl;
+    }
   }
 
   if (!skills.length) {
@@ -108,6 +113,7 @@ export async function fetchLinkedInProfileMetadata(
       education,
       jobPreferences,
       profileUrl,
+      profilePictureUrl,
       warnings,
     },
     raw,
@@ -118,6 +124,7 @@ export async function fetchLinkedInProfileMetadata(
 function parseUserinfo(data: unknown): {
   headline: string | null;
   profileUrl: string | null;
+  profilePictureUrl: string | null;
 } {
   const info = data as Record<string, unknown>;
   const name =
@@ -129,18 +136,23 @@ function parseUserinfo(data: unknown): {
           .trim() || null;
 
   const profileUrl = typeof info.profile === "string" ? info.profile : null;
+  const profilePictureUrl =
+    typeof info.picture === "string" && info.picture.trim()
+      ? info.picture
+      : null;
 
   const headline =
     typeof info.headline === "string" && info.headline.trim()
       ? info.headline
       : name;
 
-  return { headline, profileUrl };
+  return { headline, profileUrl, profilePictureUrl };
 }
 
 function parseIdentityMe(data: unknown): {
   headline: string | null;
   profileUrl: string | null;
+  profilePictureUrl: string | null;
   experience: LinkedInExperience[];
   education: LinkedInEducation[];
 } {
@@ -148,6 +160,7 @@ function parseIdentityMe(data: unknown): {
   const basicInfo = root.basicInfo as Record<string, unknown> | undefined;
   const profileUrl =
     typeof basicInfo?.profileUrl === "string" ? basicInfo.profileUrl : null;
+  const profilePictureUrl = extractProfilePictureUrl(basicInfo?.profilePicture);
 
   const firstName = localizedString(basicInfo?.firstName);
   const lastName = localizedString(basicInfo?.lastName);
@@ -180,7 +193,37 @@ function parseIdentityMe(data: unknown): {
       ? `${experience[0].title} at ${experience[0].company}`
       : displayName;
 
-  return { headline, profileUrl, experience, education };
+  return { headline, profileUrl, profilePictureUrl, experience, education };
+}
+
+function extractProfilePictureUrl(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) return value;
+
+  if (!value || typeof value !== "object") return null;
+
+  const obj = value as Record<string, unknown>;
+  const direct =
+    obj.url ?? obj.profilePictureUrl ?? obj.displayImageUrl ?? obj.imageUrl;
+  if (typeof direct === "string" && direct.trim()) return direct;
+
+  const displayImage = obj.displayImage;
+  if (typeof displayImage === "string" && displayImage.startsWith("http")) {
+    return displayImage;
+  }
+
+  const decorated = obj["displayImage~"] as
+    | { elements?: { identifiers?: { identifier?: string }[] }[] }
+    | undefined;
+  const elements = decorated?.elements ?? [];
+  for (const element of elements) {
+    for (const id of element.identifiers ?? []) {
+      if (typeof id.identifier === "string" && id.identifier.startsWith("http")) {
+        return id.identifier;
+      }
+    }
+  }
+
+  return null;
 }
 
 function localizedString(value: unknown): string | null {
@@ -239,6 +282,7 @@ export function parseLinkedInProfileRecord(record: {
   jobPreferences: string;
   profileCompleteness: number;
   profileUrl: string | null;
+  profilePictureUrl?: string | null;
   warnings: string | null;
   connectedAt: Date;
   fetchedAt: Date;
@@ -251,6 +295,7 @@ export function parseLinkedInProfileRecord(record: {
     jobPreferences: JSON.parse(record.jobPreferences) as LinkedInJobPreference[],
     profileCompleteness: record.profileCompleteness,
     profileUrl: record.profileUrl,
+    profilePictureUrl: record.profilePictureUrl ?? null,
     warnings: record.warnings ? (JSON.parse(record.warnings) as string[]) : [],
     connectedAt: record.connectedAt.toISOString(),
     fetchedAt: record.fetchedAt.toISOString(),
