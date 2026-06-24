@@ -58,7 +58,7 @@ export async function PUT(request: Request) {
       userId: session.user.id,
       content,
     },
-    update: { content, updatedAt: new Date() },
+    update: { content, isActive: true, updatedAt: new Date() },
   });
 
   return NextResponse.json({

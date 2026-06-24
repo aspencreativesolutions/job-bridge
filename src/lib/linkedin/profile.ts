@@ -4,6 +4,7 @@ import type {
   LinkedInJobPreference,
   LinkedInProfileData,
 } from "../types";
+import { getLinkedInProfileTier, hasVerifiedProfileScopes } from "./scopes";
 
 const LINKEDIN_USERINFO = "https://api.linkedin.com/v2/userinfo";
 const LINKEDIN_REST_IDENTITY = "https://api.linkedin.com/rest/identityMe";
@@ -23,6 +24,7 @@ export async function fetchLinkedInProfileMetadata(
 ): Promise<FetchResult> {
   const raw: Record<string, unknown> = {};
   const warnings: string[] = [];
+  const tier = getLinkedInProfileTier();
 
   let headline: string | null = null;
   let skills: string[] = [];
@@ -34,6 +36,7 @@ export async function fetchLinkedInProfileMetadata(
   const identityResult = await linkedInGet(LINKEDIN_REST_IDENTITY, accessToken, {
     "Linkedin-Version": LINKEDIN_API_VERSION,
   });
+
   if (identityResult.data) {
     raw.identityMe = identityResult.data;
     const parsed = parseIdentityMe(identityResult.data);
@@ -42,9 +45,15 @@ export async function fetchLinkedInProfileMetadata(
     education = parsed.education;
     profileUrl = parsed.profileUrl;
   } else if (identityResult.status === 403) {
-    warnings.push(
-      "LinkedIn denied profile access. Add the “Verified on LinkedIn” product and r_profile_basicinfo scope in your LinkedIn developer app, then sign out and sign in again."
-    );
+    if (!hasVerifiedProfileScopes()) {
+      warnings.push(
+        "Profile details need LinkedIn’s Verified on LinkedIn product. Set LINKEDIN_PROFILE_TIER=development (or lite/plus) in .env, add the product in your LinkedIn developer app, then sign out and sign in again."
+      );
+    } else {
+      warnings.push(
+        "LinkedIn denied profile access (403). Confirm “Verified on LinkedIn” is enabled on your developer app and that you re-authorized after adding scopes."
+      );
+    }
   } else if (identityResult.error) {
     warnings.push(`LinkedIn profile API: ${identityResult.error}`);
   }
@@ -55,78 +64,41 @@ export async function fetchLinkedInProfileMetadata(
     const parsed = parseUserinfo(userinfoResult.data);
     if (!profileUrl && parsed.profileUrl) profileUrl = parsed.profileUrl;
     if (!headline && parsed.headline) headline = parsed.headline;
-    if (!experience.length && parsed.experience.length) {
-      experience = parsed.experience;
-    }
-  }
-
-  const legacyResult = await linkedInGet(
-    "https://api.linkedin.com/v2/me?projection=(id,localizedHeadline,vanityName)",
-    accessToken
-  );
-  if (legacyResult.data) {
-    raw.legacyMe = legacyResult.data;
-    const leg = legacyResult.data as Record<string, unknown>;
-    if (!headline && leg.localizedHeadline) {
-      headline = String(leg.localizedHeadline);
-    }
-    if (!profileUrl && leg.vanityName) {
-      profileUrl = `https://www.linkedin.com/in/${leg.vanityName}`;
-    }
-  }
-
-  const positionsResult = await linkedInGet(
-    "https://api.linkedin.com/v2/positions?q=owners&owners=urn:li:person:" +
-      encodeURIComponent(
-        String((raw.identityMe as Record<string, unknown>)?.id ?? "")
-      ) +
-      "&projection=(elements*(title,companyName,company~(localizedName)))",
-    accessToken
-  );
-  if (positionsResult.data) {
-    raw.positions = positionsResult.data;
-    const fromPositions = parsePositions(positionsResult.data);
-    if (fromPositions.length > experience.length) {
-      experience = fromPositions;
-    }
-  }
-
-  const skillsResult = await linkedInGet(
-    "https://api.linkedin.com/v2/skills?q=owners&owners=urn:li:person:" +
-      encodeURIComponent(
-        String((raw.identityMe as Record<string, unknown>)?.id ?? "")
-      ),
-    accessToken
-  );
-  if (skillsResult.data) {
-    raw.skills = skillsResult.data;
-    skills = parseSkills(skillsResult.data);
   }
 
   if (!skills.length) {
     warnings.push(
-      "Skills are not exposed by LinkedIn’s API for this app tier. Only data LinkedIn returns is shown."
-    );
-  }
-  if (!jobPreferences.length) {
-    warnings.push(
-      "Open-to-work job preferences are not available via LinkedIn’s public API."
+      "Skills are not available from LinkedIn’s API (including Verified on LinkedIn). Add skills on your resume page or import a resume."
     );
   }
 
-  if (
-    !headline &&
-    !experience.length &&
-    !education.length &&
-    !profileUrl
-  ) {
+  if (!jobPreferences.length) {
+    warnings.push(
+      "Open-to-work job preferences are not exposed by LinkedIn’s public API."
+    );
+  }
+
+  if (tier === "basic" && !experience.length && !education.length) {
+    warnings.push(
+      "Experience and education require LINKEDIN_PROFILE_TIER=plus in .env plus the Verified on LinkedIn Plus tier on your developer app."
+    );
+  } else if (tier === "development" || tier === "lite") {
+    if (!experience.length && !education.length && identityResult.data) {
+      warnings.push(
+        "Current job and education require Verified on LinkedIn Plus (LINKEDIN_PROFILE_TIER=plus)."
+      );
+    }
+  }
+
+  if (!headline && !experience.length && !education.length && !profileUrl) {
     throw new Error(
       warnings[0] ??
-        "LinkedIn did not return profile data. Your app may need the Verified on LinkedIn product for job and education details."
+        "LinkedIn did not return profile data. Enable Verified on LinkedIn on your developer app."
     );
   }
 
   raw.source = "live";
+  raw.profileTier = tier;
 
   return {
     profile: {
@@ -146,7 +118,6 @@ export async function fetchLinkedInProfileMetadata(
 function parseUserinfo(data: unknown): {
   headline: string | null;
   profileUrl: string | null;
-  experience: LinkedInExperience[];
 } {
   const info = data as Record<string, unknown>;
   const name =
@@ -160,13 +131,11 @@ function parseUserinfo(data: unknown): {
   const profileUrl = typeof info.profile === "string" ? info.profile : null;
 
   const headline =
-    typeof info.headline === "string"
+    typeof info.headline === "string" && info.headline.trim()
       ? info.headline
-      : name
-        ? `${name}${typeof info.email === "string" ? ` · ${info.email}` : ""}`
-        : null;
+      : name;
 
-  return { headline, profileUrl, experience: [] };
+  return { headline, profileUrl };
 }
 
 function parseIdentityMe(data: unknown): {
@@ -179,6 +148,10 @@ function parseIdentityMe(data: unknown): {
   const basicInfo = root.basicInfo as Record<string, unknown> | undefined;
   const profileUrl =
     typeof basicInfo?.profileUrl === "string" ? basicInfo.profileUrl : null;
+
+  const firstName = localizedString(basicInfo?.firstName);
+  const lastName = localizedString(basicInfo?.lastName);
+  const displayName = [firstName, lastName].filter(Boolean).join(" ").trim() || null;
 
   const experience: LinkedInExperience[] = [];
   const position = root.primaryCurrentPosition as
@@ -205,46 +178,9 @@ function parseIdentityMe(data: unknown): {
   const headline =
     experience.length > 0
       ? `${experience[0].title} at ${experience[0].company}`
-      : null;
+      : displayName;
 
   return { headline, profileUrl, experience, education };
-}
-
-function parsePositions(data: unknown): LinkedInExperience[] {
-  const elements =
-    (data as { elements?: unknown[] })?.elements ?? [];
-  const experience: LinkedInExperience[] = [];
-
-  for (const item of elements) {
-    const pos = item as Record<string, unknown>;
-    const title =
-      localizedString(pos.title) ??
-      (typeof pos.localizedTitle === "string" ? pos.localizedTitle : null);
-    const company =
-      localizedString(pos.companyName) ??
-      localizedString((pos.company as Record<string, unknown>)?.localizedName) ??
-      (typeof pos.companyName === "string" ? pos.companyName : null);
-    if (title && company) {
-      experience.push({ title, company });
-    }
-  }
-
-  return experience;
-}
-
-function parseSkills(data: unknown): string[] {
-  const elements = (data as { elements?: unknown[] })?.elements ?? [];
-  const skills: string[] = [];
-
-  for (const item of elements) {
-    const skill = item as Record<string, unknown>;
-    const name =
-      localizedString(skill.name) ??
-      (typeof skill.localizedName === "string" ? skill.localizedName : null);
-    if (name) skills.push(name);
-  }
-
-  return skills;
 }
 
 function localizedString(value: unknown): string | null {

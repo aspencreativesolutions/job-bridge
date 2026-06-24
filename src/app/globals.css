@@ -3,6 +3,11 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --dash-bg: #0a0e1a;
+  --dash-surface: rgba(15, 23, 42, 0.65);
+  --dash-border: rgba(148, 163, 184, 0.12);
+  --dash-accent: #22d3ee;
+  --dash-accent-2: #a78bfa;
 }
 
 @theme inline {
@@ -48,5 +53,41 @@ body {
 
   .nav-link {
     @apply text-base font-bold text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100;
+  }
+
+  .dash-page {
+    background: var(--dash-bg);
+    color: #e2e8f0;
+  }
+
+  .dash-page-glow {
+    background:
+      radial-gradient(ellipse 80% 50% at 20% 20%, rgba(34, 211, 238, 0.08), transparent),
+      radial-gradient(ellipse 60% 40% at 80% 60%, rgba(167, 139, 250, 0.1), transparent),
+      radial-gradient(ellipse 50% 30% at 50% 100%, rgba(59, 130, 246, 0.06), transparent);
+  }
+
+  .dash-glass-panel,
+  .dash-box {
+    @apply rounded-xl border border-slate-600/70 bg-slate-800/95 p-4 shadow-lg;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+      0 4px 24px -4px rgba(0, 0, 0, 0.45);
+  }
+
+  .dash-box-sm {
+    @apply rounded-lg border border-slate-600/60 bg-slate-800/90 p-3 shadow-md;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  }
+
+  .company-carousel {
+    @apply flex gap-3 overflow-x-auto pb-1;
+    scroll-snap-type: x mandatory;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .company-carousel::-webkit-scrollbar {
+    display: none;
   }
 }

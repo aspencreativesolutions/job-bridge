@@ -3,6 +3,7 @@ import LinkedIn from "next-auth/providers/linkedin";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "./db";
 import { authConfig } from "./auth.config";
+import { getLinkedInOAuthScopes } from "./linkedin/scopes";
 
 export function getLinkedInCredentials() {
   const clientId =
@@ -31,7 +32,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       clientSecret: clientSecret ?? "missing-client-secret",
       authorization: {
         params: {
-          scope: "openid profile email",
+          scope: getLinkedInOAuthScopes(),
         },
       },
     }),

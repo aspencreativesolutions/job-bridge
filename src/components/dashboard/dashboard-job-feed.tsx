@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Send, ExternalLink, CheckCircle2, X } from "lucide-react";
+import { parseJobLocation } from "@/lib/jobs/location";
 
 interface JobApplication {
   id: string;
@@ -18,6 +19,12 @@ export interface DashboardJob {
   salaryMax: number | null;
   isNew: boolean;
   applications: JobApplication[];
+}
+
+interface Props {
+  jobs?: DashboardJob[];
+  onJobsChange?: (jobs: DashboardJob[]) => void;
+  glass?: boolean;
 }
 
 function formatSalaryRange(min: number | null, max: number | null): string | null {
@@ -44,26 +51,31 @@ function appliedLabel(status: string): string {
   return "Pending";
 }
 
-export function DashboardJobFeed() {
-  const [jobs, setJobs] = useState<DashboardJob[]>([]);
+export function DashboardJobFeed({ jobs: externalJobs, onJobsChange, glass }: Props) {
+  const [internalJobs, setInternalJobs] = useState<DashboardJob[]>([]);
   const [message, setMessage] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const jobs = externalJobs ?? internalJobs;
+  const setJobs = onJobsChange ?? setInternalJobs;
 
   const loadJobs = useCallback(async () => {
     const res = await fetch("/api/jobs");
     const data = await res.json();
     setJobs(data);
-  }, []);
+  }, [setJobs]);
 
   useEffect(() => {
+    if (externalJobs !== undefined) return;
     loadJobs();
-  }, [loadJobs]);
+  }, [loadJobs, externalJobs]);
 
   useEffect(() => {
+    if (externalJobs !== undefined) return;
     const handler = () => loadJobs();
     window.addEventListener("jobbridge:refresh-jobs", handler);
     return () => window.removeEventListener("jobbridge:refresh-jobs", handler);
-  }, [loadJobs]);
+  }, [loadJobs, externalJobs]);
 
   async function apply(jobId: string) {
     const res = await fetch("/api/applications", {
@@ -100,19 +112,20 @@ export function DashboardJobFeed() {
   const appliedJobs = jobs.filter(isApplied);
   const readyJobs = jobs.filter((j) => !isApplied(j));
 
+  const messageClass = glass
+    ? "dash-box text-sm font-medium text-slate-200"
+    : "rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium dark:bg-zinc-900";
+
   return (
-    <div className="space-y-8">
-      {message && (
-        <p className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium dark:bg-zinc-900">
-          {message}
-        </p>
-      )}
+    <div className="space-y-5">
+      {message && <p className={messageClass}>{message}</p>}
 
       <JobSection
         title="Applied"
         description="Jobs you've applied to (auto or manual)."
         jobs={appliedJobs}
         emptyText="No applied jobs yet. Enable Auto-Apply or click Apply on a matching job."
+        glass={glass}
         renderAction={(job) => {
           const app = job.applications[0];
           const label = appliedLabel(app.status);
@@ -121,10 +134,10 @@ export function DashboardJobFeed() {
               <span
                 className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold ${
                   app.status === "submitted"
-                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                    ? "bg-emerald-500/20 text-emerald-300"
                     : app.status === "needs_review"
-                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-                      : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                      ? "bg-amber-500/20 text-amber-300"
+                      : "bg-white/10 text-slate-400"
                 }`}
               >
                 <CheckCircle2 className="h-4 w-4" />
@@ -135,7 +148,7 @@ export function DashboardJobFeed() {
                   href={job.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-sm font-bold text-blue-600 underline hover:text-blue-800"
+                  className="flex items-center gap-1 text-sm font-bold text-cyan-400 underline hover:text-cyan-300"
                 >
                   View application
                   <ExternalLink className="h-3.5 w-3.5" />
@@ -146,7 +159,7 @@ export function DashboardJobFeed() {
                 onClick={() => removeApplication(app.id)}
                 disabled={deletingId === app.id}
                 title="Remove application"
-                className="rounded-md p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                className="rounded-md p-1.5 text-slate-500 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -159,7 +172,8 @@ export function DashboardJobFeed() {
         title="Ready to apply"
         description="Matching jobs waiting for your action."
         jobs={readyJobs}
-        emptyText="No new matches. Update your preferences on the right and click Save & refresh jobs."
+        emptyText="No new matches. Update your preferences and click Save & refresh jobs."
+        glass={glass}
         renderAction={(job) => (
           <div className="flex items-center gap-2">
             {job.url && (
@@ -167,7 +181,7 @@ export function DashboardJobFeed() {
                 href={job.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                className="rounded-md p-2 text-slate-400 hover:bg-white/5"
                 title="View job posting"
               >
                 <ExternalLink className="h-4 w-4" />
@@ -175,7 +189,7 @@ export function DashboardJobFeed() {
             )}
             <button
               onClick={() => apply(job.id)}
-              className="flex items-center gap-1.5 rounded-md bg-zinc-900 px-4 py-2 text-sm font-bold text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
+              className="flex items-center gap-1.5 rounded-md bg-cyan-500 px-4 py-2 text-sm font-bold text-slate-900 hover:bg-cyan-400"
             >
               <Send className="h-3.5 w-3.5" />
               Apply
@@ -193,43 +207,63 @@ function JobSection({
   jobs,
   emptyText,
   renderAction,
+  glass,
 }: {
   title: string;
   description: string;
   jobs: DashboardJob[];
   emptyText: string;
   renderAction: (job: DashboardJob) => React.ReactNode;
+  glass?: boolean;
 }) {
+  const sectionWrap = glass ? "dash-box" : "";
+  const titleClass = glass
+    ? "text-lg font-bold text-white"
+    : "section-title mb-1";
+  const descClass = glass ? "text-sm text-slate-400" : "text-sm text-zinc-500";
+  const emptyClass = glass
+    ? "dash-box-sm py-8 text-center text-sm text-slate-500"
+    : "rounded-lg border border-dashed border-zinc-300 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700";
+  const metaClass = glass
+    ? "text-sm font-medium text-slate-400"
+    : "text-sm font-medium text-zinc-500";
+
   return (
-    <section>
-      <h2 className="section-title mb-1">{title}</h2>
-      <p className="mb-4 text-sm text-zinc-500">{description}</p>
+    <section className={sectionWrap}>
+      <h2 className={titleClass}>{title}</h2>
+      <p className={`mb-4 mt-1 ${descClass}`}>{description}</p>
 
       {jobs.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-zinc-300 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700">
-          {emptyText}
-        </p>
+        <p className={emptyClass}>{emptyText}</p>
       ) : (
-        <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+        <ul className="space-y-3">
           {jobs.map((job) => {
             const salary = formatSalaryRange(job.salaryMin, job.salaryMax);
+            const { stateCode } = parseJobLocation(job.location);
+            const itemClass = glass
+              ? "dash-box-sm flex flex-wrap items-center justify-between gap-4"
+              : "flex flex-wrap items-center justify-between gap-4 rounded-lg border border-zinc-200 px-6 py-4 dark:border-zinc-800";
             return (
-              <li
-                key={job.id}
-                className="flex flex-wrap items-center justify-between gap-4 px-6 py-4"
-              >
+              <li key={job.id} className={itemClass}>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="item-title">{job.title}</h3>
+                    <h3
+                      className={
+                        glass ? "text-lg font-bold text-white" : "item-title"
+                      }
+                    >
+                      {job.title}
+                    </h3>
                     {job.isNew && (
-                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                      <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-xs font-bold text-cyan-300">
                         New
                       </span>
                     )}
                   </div>
-                  <p className="text-sm font-medium text-zinc-500">
+                  <p className={metaClass}>
                     {job.company}
                     {job.location ? ` · ${job.location}` : ""}
+                    {stateCode && glass ? ` (${stateCode})` : ""}
                     {salary ? ` · ${salary}` : ""}
                   </p>
                 </div>

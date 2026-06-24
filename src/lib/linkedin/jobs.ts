@@ -101,16 +101,37 @@ function mockJobSearch(preferences: JobPreferencesData): LinkedInJob[] {
     "InnovateLabs",
   ];
 
+  const mockLocations = [
+    "San Francisco, CA",
+    "New York, NY",
+    "Austin, TX",
+    "Seattle, WA",
+    "Chicago, IL",
+    "Denver, CO",
+    "Boston, MA",
+    "Atlanta, GA",
+    "Miami, FL",
+    "Portland, OR",
+    "Remote",
+    "Los Angeles, CA",
+    "Dallas, TX",
+    "Phoenix, AZ",
+    "Philadelphia, PA",
+  ];
+
   const now = Date.now();
   const jobs = titles.flatMap((title, ti) =>
     industries.slice(0, 2).map((industry, ii) => {
       const idx = ti * 2 + ii;
       const salary = MOCK_SALARIES[idx % MOCK_SALARIES.length];
+      const prefLocation = preferences.locations[idx % preferences.locations.length];
+      const location =
+        prefLocation ?? mockLocations[idx % mockLocations.length];
       return {
         externalId: `mock-${title.toLowerCase().replace(/\s+/g, "-")}-${idx}-${Math.floor(now / 86400000)}`,
         title: `${title} — ${industry}`,
         company: companies[idx % companies.length],
-        location: preferences.locations[0] ?? "Remote",
+        location,
         description: `We are looking for a talented ${title} to join our ${industry} team. Annual compensation discussed during interview.`,
         salaryMin: salary.min,
         salaryMax: salary.max,

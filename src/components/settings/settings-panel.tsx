@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Save } from "lucide-react";
 import type { JobPreferencesData } from "@/lib/types";
+import { SalaryRangeSelect } from "@/components/ui/salary-range-select";
 
 interface Props {
   initialPreferences: JobPreferencesData;
@@ -19,6 +20,7 @@ export function SettingsPanel({
     useState<JobPreferencesData>(initialPreferences);
   const [coverLetter, setCoverLetter] = useState(initialCoverLetter);
   const [saving, setSaving] = useState(false);
+  const [autoApplySaving, setAutoApplySaving] = useState(false);
   const [message, setMessage] = useState("");
 
   function updateList(
@@ -49,6 +51,29 @@ export function SettingsPanel({
       setMessage("Failed to save settings.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function toggleAutoApply() {
+    const next = !preferences.autoApply;
+    const payload = { ...preferences, autoApply: next };
+    setPreferences(payload);
+    setAutoApplySaving(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: payload, coverLetter }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error("Save failed");
+      setPreferences(data.preferences);
+    } catch {
+      setPreferences((p) => ({ ...p, autoApply: !next }));
+      setMessage("Failed to save auto-apply setting.");
+    } finally {
+      setAutoApplySaving(false);
     }
   }
 
@@ -123,40 +148,17 @@ export function SettingsPanel({
             onChange={(v) => updateList("keywords", v)}
             placeholder="React, TypeScript, remote"
           />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="mb-1 block text-zinc-500">Min salary (USD / yr)</span>
-              <input
-                type="number"
-                min={0}
-                step={1000}
-                className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
-                value={preferences.salaryMin ?? ""}
-                onChange={(e) =>
-                  setPreferences((p) => ({
-                    ...p,
-                    salaryMin: e.target.value ? parseInt(e.target.value, 10) : null,
-                  }))
-                }
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-zinc-500">Max salary (USD / yr)</span>
-              <input
-                type="number"
-                min={0}
-                step={1000}
-                className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
-                value={preferences.salaryMax ?? ""}
-                onChange={(e) =>
-                  setPreferences((p) => ({
-                    ...p,
-                    salaryMax: e.target.value ? parseInt(e.target.value, 10) : null,
-                  }))
-                }
-              />
-            </label>
-          </div>
+          <label className="block text-sm">
+            <span className="mb-1 block text-zinc-500">Salary range (USD / yr)</span>
+            <SalaryRangeSelect
+              salaryMin={preferences.salaryMin}
+              salaryMax={preferences.salaryMax}
+              onChange={(salaryMin, salaryMax) =>
+                setPreferences((p) => ({ ...p, salaryMin, salaryMax }))
+              }
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+            />
+          </label>
           <label className="block text-sm">
             <span className="mb-1 block text-zinc-500">
               Scan interval (minutes)
@@ -195,20 +197,34 @@ export function SettingsPanel({
               setPreferences((p) => ({ ...p, notifyEmail: v }))
             }
           />
-          <Toggle
-            label="Auto-apply to new matching jobs"
-            checked={preferences.autoApply}
-            onChange={(v) =>
-              setPreferences((p) => ({ ...p, autoApply: v }))
-            }
-          />
-          {preferences.autoApply && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
-              Auto-apply sends your active resume and cover letter. Jobs requiring
-              extra fields are logged for your review.
-            </p>
-          )}
         </div>
+      </section>
+
+      <section className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="card-label">Auto-apply</p>
+            <p className="mt-1 text-sm text-zinc-500">
+              Automatically apply to new matching jobs with your resume and cover
+              letter.
+            </p>
+          </div>
+          <Switch
+            checked={preferences.autoApply}
+            disabled={autoApplySaving}
+            ariaLabel="Auto-apply to new matching jobs"
+            onChange={() => void toggleAutoApply()}
+          />
+        </div>
+        {autoApplySaving && (
+          <p className="mt-3 text-xs text-zinc-500">Saving…</p>
+        )}
+        {preferences.autoApply && !autoApplySaving && (
+          <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
+            Auto-apply sends your active resume and cover letter. Jobs requiring
+            extra fields are logged for your review.
+          </p>
+        )}
       </section>
 
       <section className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
@@ -271,5 +287,39 @@ function Toggle({
       />
       {label}
     </label>
+  );
+}
+
+function Switch({
+  checked,
+  disabled,
+  ariaLabel,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  ariaLabel: string;
+  onChange: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onChange}
+      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+        checked
+          ? "bg-zinc-900 dark:bg-zinc-100"
+          : "bg-zinc-300 dark:bg-zinc-700"
+      }`}
+    >
+      <span
+        className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform dark:bg-zinc-900 ${
+          checked ? "translate-x-5" : "translate-x-0"
+        }`}
+      />
+    </button>
   );
 }
