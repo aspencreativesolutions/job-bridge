@@ -139,8 +139,8 @@ export function DashboardView({
 
   return (
     <div className="relative space-y-5">
-        <div className="grid gap-5 lg:grid-cols-2 lg:items-stretch">
-          <div className="dash-box flex shrink-0 flex-col divide-y divide-white/10 sm:flex-row sm:items-center sm:divide-x sm:divide-y-0">
+        <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+          <div className="dash-box flex shrink-0 flex-col divide-y divide-white/10 p-0 sm:flex-row sm:items-center sm:divide-x sm:divide-y-0">
             <GlassStat
               icon={<Briefcase className="h-3.5 w-3.5 text-cyan-400" />}
               label="Jobs found"
@@ -170,9 +170,8 @@ export function DashboardView({
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-stretch">
-          <div className="dash-box flex min-h-[260px] flex-col overflow-hidden p-0">
-            <div className="flex-1">
-              <UsJobMap
+          <div className="dash-box min-h-0 overflow-hidden p-0">
+            <UsJobMap
                 markers={mapMarkers}
                 selectedMarkerId={selectedMarkerId}
                 onSelectMarker={setSelectedMarkerId}
@@ -180,8 +179,7 @@ export function DashboardView({
                 onEnterFocus={() => setMapFocused(true)}
                 onExitFocus={() => setMapFocused(false)}
                 remoteCount={remoteCount}
-              />
-            </div>
+            />
           </div>
           <CompaniesInFieldBox preferences={preferences} glass />
           <ConfigurePreferences
@@ -233,12 +231,12 @@ function GlassStat({
   return (
     <div
       className={`flex flex-1 items-center ${
-        compact ? "gap-2 px-3 py-2" : "gap-4"
+        compact ? "gap-2 px-3 py-1.5" : "gap-4"
       } ${inline && !compact ? "px-4 py-3 sm:py-0" : ""}`}
     >
       <div
         className={`flex shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 ${
-          compact ? "h-8 w-8" : "h-10 w-10"
+          compact ? "h-7 w-7" : "h-10 w-10"
         }`}
       >
         {icon}

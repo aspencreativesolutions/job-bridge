@@ -8,8 +8,19 @@ import { MapPin, Minus, Plus, RotateCcw, X } from "lucide-react";
 
 const MAP_W = 960;
 const MAP_H = 580;
-const MAX_ZOOM = 5;
+/** Preview map render height — kept fixed so shrinking the container crops, not scales. */
+const PREVIEW_MAP_H = 280;
+/** ~150× zoom — enough to frame a single town in the viewport. */
+const MAX_ZOOM = 150;
 const ZOOM_STEP = 1.25;
+const STATE_STROKE_BASE = 1.25;
+const STATE_STROKE_MIN = 0.015;
+
+/** Thinner borders on screen as the user zooms in (quadratic falloff in viewBox units). */
+function stateStrokeWidth(viewBoxW: number): number {
+  const t = viewBoxW / MAP_W;
+  return Math.max(STATE_STROKE_MIN, STATE_STROKE_BASE * t * t);
+}
 
 interface ViewBox {
   x: number;
@@ -41,7 +52,6 @@ function useMapZoom() {
     vbX: number;
     vbY: number;
   } | null>(null);
-  const didInteractRef = useRef(false);
 
   const resetZoom = useCallback(() => {
     setViewBox(DEFAULT_VIEW_BOX);
@@ -68,7 +78,6 @@ function useMapZoom() {
         h: nextH,
       });
     });
-    didInteractRef.current = true;
   }, []);
 
   const zoomIn = useCallback(() => zoomBy(ZOOM_STEP), [zoomBy]);
@@ -122,9 +131,6 @@ function useMapZoom() {
 
     const dx = ((e.clientX - drag.startX) / rect.width) * viewBox.w;
     const dy = ((e.clientY - drag.startY) / rect.height) * viewBox.h;
-    if (Math.abs(e.clientX - drag.startX) > 4 || Math.abs(e.clientY - drag.startY) > 4) {
-      didInteractRef.current = true;
-    }
 
     setViewBox((current) =>
       clampViewBox({
@@ -140,12 +146,6 @@ function useMapZoom() {
     e.currentTarget.releasePointerCapture(e.pointerId);
   }, []);
 
-  const consumeInteraction = useCallback(() => {
-    const consumed = didInteractRef.current;
-    didInteractRef.current = false;
-    return consumed;
-  }, []);
-
   const isZoomed = viewBox.w < MAP_W - 1 || viewBox.h < MAP_H - 1;
 
   return {
@@ -159,7 +159,6 @@ function useMapZoom() {
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
-    consumeInteraction,
   };
 }
 
@@ -214,6 +213,9 @@ function MapZoomControls({
 }
 
 function MarkerTooltip({ marker }: { marker: JobMapMarker }) {
+  const showOriginalLocation =
+    marker.placeName.trim().toLowerCase() !== marker.location.trim().toLowerCase();
+
   return (
     <div className="w-max min-w-[220px] max-w-[calc(100vw-2rem)] rounded-lg border border-cyan-500/30 bg-slate-900/95 px-3 py-2 shadow-xl backdrop-blur-sm">
       <p className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-cyan-400/90">
@@ -223,7 +225,11 @@ function MarkerTooltip({ marker }: { marker: JobMapMarker }) {
         {marker.title}
       </p>
       <p className="truncate text-xs text-slate-300">{marker.company}</p>
-      <p className="truncate text-xs text-slate-500">{marker.location}</p>
+      {showOriginalLocation ? (
+        <p className="truncate text-xs text-slate-500">
+          Listed as {marker.location}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -234,6 +240,7 @@ function MarkerDot({
   interactive,
   hovered,
   glowId,
+  scale,
   onSelect,
   onHover,
 }: {
@@ -242,10 +249,11 @@ function MarkerDot({
   interactive: boolean;
   hovered: boolean;
   glowId: string;
+  scale: number;
   onSelect: () => void;
   onHover: (hovered: boolean) => void;
 }) {
-  const r = selected ? 3.5 : 2.5;
+  const r = (selected ? 3.5 : 2.5) * scale;
   return (
     <g
       className="cursor-pointer"
@@ -274,7 +282,7 @@ function MarkerDot({
         r={hovered || selected ? r + 1 : r}
         fill={selected || hovered ? "rgb(34, 211, 238)" : "rgb(56, 189, 248)"}
         stroke={selected ? "white" : "rgba(255,255,255,0.7)"}
-        strokeWidth={selected ? 1.5 : 0.75}
+        strokeWidth={(selected ? 1.5 : 0.75) * scale}
         className="transition-all duration-200"
         style={{
           filter: selected || hovered ? `url(#${glowId})` : undefined,
@@ -323,6 +331,8 @@ export function UsJobMap({
   );
 
   const viewBoxStr = `${zoom.viewBox.x} ${zoom.viewBox.y} ${zoom.viewBox.w} ${zoom.viewBox.h}`;
+  const borderStroke = stateStrokeWidth(zoom.viewBox.w);
+  const markerScale = zoom.viewBox.w / MAP_W;
 
   const mapSvg = (
     <svg
@@ -344,9 +354,12 @@ export function UsJobMap({
         <path
           key={id}
           d={path}
-          fill="rgba(30, 41, 59, 0.35)"
-          stroke="rgba(148, 163, 184, 0.35)"
-          strokeWidth={0.6}
+          fill="rgba(30, 41, 59, 0.55)"
+          stroke="rgba(203, 213, 225, 0.9)"
+          strokeWidth={borderStroke}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          shapeRendering="geometricPrecision"
           className="pointer-events-none"
         />
       ))}
@@ -358,6 +371,7 @@ export function UsJobMap({
           hovered={hoveredMarkerId === marker.id}
           interactive={focused}
           glowId={glowId}
+          scale={markerScale}
           onHover={(hovered) =>
             setHoveredMarkerId(hovered ? marker.id : null)
           }
@@ -392,12 +406,16 @@ export function UsJobMap({
   const mapViewport = (
     <div
       ref={zoom.containerRef}
-      className="h-full w-full cursor-grab active:cursor-grabbing"
-      onWheel={zoom.handleWheel}
-      onPointerDown={zoom.handlePointerDown}
-      onPointerMove={zoom.handlePointerMove}
-      onPointerUp={zoom.handlePointerUp}
-      onPointerCancel={zoom.handlePointerUp}
+      className={
+        focused
+          ? "h-full w-full cursor-grab active:cursor-grabbing"
+          : "h-full w-full"
+      }
+      onWheel={focused ? zoom.handleWheel : undefined}
+      onPointerDown={focused ? zoom.handlePointerDown : undefined}
+      onPointerMove={focused ? zoom.handlePointerMove : undefined}
+      onPointerUp={focused ? zoom.handlePointerUp : undefined}
+      onPointerCancel={focused ? zoom.handlePointerUp : undefined}
       onClick={(e) => e.stopPropagation()}
     >
       {mapSvg}
@@ -456,7 +474,7 @@ export function UsJobMap({
                     {selectedMarker.title}
                   </p>
                   <p className="mt-2 text-xs text-slate-400">
-                    {selectedMarker.location}
+                    {selectedMarker.placeName}
                     {selectedMarker.stateCode && (
                       <>
                         {" "}
@@ -466,6 +484,12 @@ export function UsJobMap({
                       </>
                     )}
                   </p>
+                  {selectedMarker.placeName.trim().toLowerCase() !==
+                  selectedMarker.location.trim().toLowerCase() ? (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Listed as {selectedMarker.location}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ) : (
@@ -490,7 +514,7 @@ export function UsJobMap({
                             {marker.company}
                           </span>
                           <span className="text-xs text-slate-500">
-                            {marker.location}
+                            {marker.placeName}
                           </span>
                         </button>
                       </li>
@@ -507,11 +531,8 @@ export function UsJobMap({
 
   return (
     <div
-      className="group relative h-full min-h-[280px] w-full cursor-pointer overflow-hidden rounded-lg bg-slate-900/60"
-      onClick={() => {
-        if (zoom.consumeInteraction()) return;
-        onEnterFocus();
-      }}
+      className="group relative h-full w-full cursor-pointer overflow-hidden rounded-lg bg-slate-900/60"
+      onClick={onEnterFocus}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -522,13 +543,14 @@ export function UsJobMap({
       }}
       aria-label="Open job location map"
     >
-      {mapTopBar}
-      {zoomControls}
-      <div className="absolute inset-0 opacity-90 transition group-hover:opacity-100 [&_g]:pointer-events-auto">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2"
+        style={{ height: PREVIEW_MAP_H }}
+      >
         {mapViewport}
       </div>
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0a0e1a] via-transparent to-[#0a0e1a]/60" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0a0e1a]/90 via-transparent to-[#0a0e1a]/40" />
 
       <div className="pointer-events-none absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3">
         <div className="dash-box-sm">

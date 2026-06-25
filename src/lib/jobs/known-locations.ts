@@ -43,6 +43,25 @@ const CITY_COORDS: Record<string, [number, number]> = {
   "jersey city, nj": [-74.0431, 40.7178],
   "newark, nj": [-74.1724, 40.7357],
   "hoboken, nj": [-74.0324, 40.7439],
+  "west new york, nj": [-74.0124, 40.7879],
+  "secaucus, nj": [-74.0565, 40.7895],
+  "fort lee, nj": [-73.9701, 40.8509],
+  "edison, nj": [-74.4121, 40.5187],
+  "princeton, nj": [-74.6593, 40.3573],
+  "paramus, nj": [-74.0754, 40.9445],
+  "morristown, nj": [-74.4774, 40.7968],
+  "woodbridge, nj": [-74.2846, 40.5576],
+  "east rutherford, nj": [-74.0971, 40.8339],
+  "elizabeth, nj": [-74.2107, 40.6639],
+  "summit, nj": [-74.3596, 40.7176],
+  "short hills, nj": [-74.3254, 40.7479],
+  "parsippany, nj": [-74.4257, 40.8579],
+  "long island city, ny": [-73.9442, 40.7447],
+  "queens, ny": [-73.7949, 40.7282],
+  "bronx, ny": [-73.8648, 40.8448],
+  "staten island, ny": [-74.1502, 40.5795],
+  "white plains, ny": [-73.7629, 41.034],
+  "yonkers, ny": [-73.8987, 40.9312],
   "palo alto, ca": [-122.143, 37.4419],
   "mountain view, ca": [-122.0838, 37.3861],
   "sunnyvale, ca": [-122.0363, 37.3688],
@@ -59,6 +78,10 @@ const LOCATION_ALIASES: Record<string, string> = {
   "new york city": "new york, ny",
   nyc: "new york, ny",
   manhattan: "new york, ny",
+  "long island city": "long island city, ny",
+  queens: "queens, ny",
+  bronx: "bronx, ny",
+  "staten island": "staten island, ny",
   "greater new york city area": "new york, ny",
   "new york city metropolitan area": "new york, ny",
   "san francisco bay area": "san francisco, ca",
@@ -75,13 +98,15 @@ const LOCATION_ALIASES: Record<string, string> = {
 };
 
 function cityKey(city: string, stateCode: string): string {
-  return `${city.trim().toLowerCase()}, ${stateCode.toUpperCase()}`;
+  return `${city.trim().toLowerCase()}, ${stateCode.trim().toLowerCase()}`;
 }
 
 export function normalizeLocationString(location: string): string {
   let raw = location.trim();
   raw = raw.replace(/,\s*(United States(?: of America)?|USA|U\.S\.A\.|US|U\.S\.)\s*$/i, "");
   raw = raw.replace(/^(?:on[- ]site|hybrid|remote|full[- ]time|part[- ]time)\s*[·•\-–—|]\s*/i, "");
+  raw = raw.replace(/\s*[·•\-–—|]\s*(?:on[- ]site|hybrid|remote|full[- ]time|part[- ]time)\s*$/i, "");
+  raw = raw.replace(/\s*\([^)]*\)\s*$/g, "");
   raw = raw.replace(/\s+/g, " ");
 
   const commaMatch = raw.match(/^([^,]+),\s*([A-Za-z.\s]+)$/);
@@ -104,6 +129,17 @@ function parseCityStateKey(location: string): string | null {
   return cityKey(match[1], match[2]);
 }
 
+export function explicitStateCode(location: string): string | null {
+  const key = parseCityStateKey(location);
+  if (!key) return null;
+  const state = key.split(", ")[1]?.toUpperCase();
+  return state ?? null;
+}
+
+function canonicalStateCode(canonicalKey: string): string | null {
+  return canonicalKey.split(", ")[1]?.toUpperCase() ?? null;
+}
+
 export function lookupKnownLocation(location: string): [number, number] | null {
   const normalized = normalizeLocationString(location);
   const lower = normalized.toLowerCase();
@@ -118,10 +154,20 @@ export function lookupKnownLocation(location: string): [number, number] | null {
     return CITY_COORDS[cityStateKey];
   }
 
-  for (const [alias, canonical] of Object.entries(LOCATION_ALIASES)) {
-    if (lower.includes(alias) && CITY_COORDS[canonical]) {
-      return CITY_COORDS[canonical];
+  const explicitState = explicitStateCode(normalized);
+
+  const aliasesByLength = Object.entries(LOCATION_ALIASES).sort(
+    (a, b) => b[0].length - a[0].length
+  );
+  for (const [alias, canonical] of aliasesByLength) {
+    if (!lower.includes(alias) || !CITY_COORDS[canonical]) continue;
+
+    const aliasState = canonicalStateCode(canonical);
+    if (explicitState && aliasState && explicitState !== aliasState) {
+      continue;
     }
+
+    return CITY_COORDS[canonical];
   }
 
   return null;

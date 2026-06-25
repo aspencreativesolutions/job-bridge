@@ -1,5 +1,9 @@
-import { lookupKnownLocation, normalizeLocationString } from "./known-locations";
-import { STATE_NAME_TO_CODE } from "./location";
+import {
+  explicitStateCode,
+  lookupKnownLocation,
+  normalizeLocationString,
+} from "./known-locations";
+import { parseJobLocation, STATE_CODE_TO_NAME, STATE_NAME_TO_CODE } from "./location";
 
 const geocodeCache = new Map<string, [number, number] | null>();
 const reverseGeocodeCache = new Map<string, string | null>();
@@ -17,36 +21,97 @@ async function throttleNominatim(): Promise<void> {
   lastNominatimRequestAt = Date.now();
 }
 
-async function geocodeWithNominatim(
-  location: string
-): Promise<[number, number] | null> {
-  const query = location.match(/\b(USA|United States)\b/i)
-    ? location
-    : `${location}, USA`;
+function stateCodeFromAddress(address: NominatimAddress): string | null {
+  const fromIso = address["ISO3166-2-lvl4"]?.replace(/^US-/, "");
+  if (fromIso && fromIso.length === 2) return fromIso.toUpperCase();
 
+  if (address.state) {
+    return STATE_NAME_TO_CODE[address.state.toLowerCase()] ?? null;
+  }
+
+  return null;
+}
+
+interface NominatimSearchHit {
+  lat: string;
+  lon: string;
+  address?: NominatimAddress;
+}
+
+function coordsFromHit(hit: NominatimSearchHit): [number, number] | null {
+  const lat = Number(hit.lat);
+  const lng = Number(hit.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return [lng, lat];
+}
+
+function pickGeocodeHit(
+  hits: NominatimSearchHit[],
+  expectedStateCode: string | null
+): [number, number] | null {
+  if (!hits.length) return null;
+
+  if (expectedStateCode) {
+    for (const hit of hits) {
+      const state = hit.address ? stateCodeFromAddress(hit.address) : null;
+      if (state === expectedStateCode) {
+        const coords = coordsFromHit(hit);
+        if (coords) return coords;
+      }
+    }
+    return null;
+  }
+
+  return coordsFromHit(hits[0]);
+}
+
+async function fetchNominatimSearch(
+  query: string,
+  limit: number
+): Promise<NominatimSearchHit[]> {
   await throttleNominatim();
 
   const url = new URL("https://nominatim.openstreetmap.org/search");
   url.searchParams.set("q", query);
   url.searchParams.set("format", "json");
-  url.searchParams.set("limit", "1");
+  url.searchParams.set("limit", String(limit));
   url.searchParams.set("countrycodes", "us");
+  url.searchParams.set("addressdetails", "1");
 
   const res = await fetch(url.toString(), {
     headers: { "User-Agent": "JobBridge/1.0 (job location map)" },
     next: { revalidate: 60 * 60 * 24 * 30 },
   });
 
-  if (!res.ok) return null;
+  if (!res.ok) return [];
 
-  const data = (await res.json()) as { lat: string; lon: string }[];
-  if (!data.length) return null;
+  return (await res.json()) as NominatimSearchHit[];
+}
 
-  const lat = Number(data[0].lat);
-  const lng = Number(data[0].lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+async function geocodeWithNominatim(
+  location: string,
+  expectedStateCode: string | null = null
+): Promise<[number, number] | null> {
+  const query = location.match(/\b(USA|United States)\b/i)
+    ? location
+    : `${location}, USA`;
 
-  return [lng, lat];
+  const hits = await fetchNominatimSearch(query, expectedStateCode ? 8 : 1);
+  const match = pickGeocodeHit(hits, expectedStateCode);
+  if (match) return match;
+
+  if (!expectedStateCode) return null;
+
+  const stateName = STATE_CODE_TO_NAME[expectedStateCode];
+  if (!stateName) return null;
+
+  const cityMatch = normalizeLocationString(location).match(/^([^,]+),/);
+  if (!cityMatch) return null;
+
+  const city = cityMatch[1].trim();
+  const structuredQuery = `${city}, ${stateName}, USA`;
+  const structuredHits = await fetchNominatimSearch(structuredQuery, 8);
+  return pickGeocodeHit(structuredHits, expectedStateCode);
 }
 
 export async function geocodeLocation(
@@ -60,21 +125,22 @@ export async function geocodeLocation(
     return geocodeCache.get(cacheKey) ?? null;
   }
 
-  const known = lookupKnownLocation(raw);
+  const { stateCode: expectedState } = parseJobLocation(raw);
+  const normalized = normalizeLocationString(raw);
+
+  const known =
+    lookupKnownLocation(raw) ??
+    lookupKnownLocation(normalized);
   if (known) {
     geocodeCache.set(cacheKey, known);
     return known;
   }
 
-  const normalized = normalizeLocationString(raw);
-  const normalizedKnown = lookupKnownLocation(normalized);
-  if (normalizedKnown) {
-    geocodeCache.set(cacheKey, normalizedKnown);
-    return normalizedKnown;
-  }
-
   try {
-    const coords = await geocodeWithNominatim(normalized);
+    const coords = await geocodeWithNominatim(
+      normalized,
+      expectedState ?? explicitStateCode(normalized)
+    );
     geocodeCache.set(cacheKey, coords);
     return coords;
   } catch {

@@ -107,87 +107,99 @@ export function DashboardJobFeed({ jobs: externalJobs, onJobsChange, glass }: Pr
     ? "dash-box text-sm font-medium text-slate-200"
     : "rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium dark:bg-zinc-900";
 
+  const tileWrap = glass
+    ? "dash-box"
+    : "rounded-xl border border-zinc-200 p-4 dark:border-zinc-800";
+
   return (
     <div className="space-y-5">
       {message && <p className={messageClass}>{message}</p>}
 
-      <JobSection
-        title="Applied"
-        description="Jobs you've applied to (auto or manual)."
-        jobs={appliedJobs}
-        emptyText="No applied jobs yet. Enable Auto-Apply or click Apply on a matching job."
-        glass={glass}
-        renderAction={(job) => {
-          const app = job.applications[0];
-          const label = appliedLabel(app.status);
-          return (
-            <div className="flex items-center gap-3">
-              <span
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold ${
-                  app.status === "submitted"
-                    ? "bg-emerald-500/20 text-emerald-300"
-                    : app.status === "needs_review"
-                      ? "bg-amber-500/20 text-amber-300"
-                      : "bg-white/10 text-slate-400"
-                }`}
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                {label}
-              </span>
-              {job.url && (
-                <a
-                  href={job.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-sm font-bold text-cyan-400 underline hover:text-cyan-300"
+      <section className={tileWrap}>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-0 lg:divide-x lg:divide-zinc-200 dark:lg:divide-white/10">
+          <JobSection
+            title="Ready to apply"
+            description="Matching jobs waiting for your action."
+            jobs={readyJobs}
+            emptyText="No new matches. Update your preferences and click Save & refresh jobs."
+            glass={glass}
+            nested
+            className="lg:pr-6"
+            renderAction={(job) => (
+              <div className="flex items-center gap-2">
+                {job.url && (
+                  <a
+                    href={job.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-md p-1 text-slate-400 hover:bg-white/5"
+                    title="View job posting"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                )}
+                <button
+                  onClick={() => apply(job.id)}
+                  className="flex items-center gap-1 rounded-md bg-cyan-500 px-2.5 py-1 text-xs font-bold text-slate-900 hover:bg-cyan-400"
                 >
-                  View application
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              )}
-              <button
-                type="button"
-                onClick={() => removeApplication(app.id)}
-                disabled={deletingId === app.id}
-                title="Remove application"
-                className="rounded-md p-1.5 text-slate-500 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          );
-        }}
-      />
-
-      <JobSection
-        title="Ready to apply"
-        description="Matching jobs waiting for your action."
-        jobs={readyJobs}
-        emptyText="No new matches. Update your preferences and click Save & refresh jobs."
-        glass={glass}
-        renderAction={(job) => (
-          <div className="flex items-center gap-2">
-            {job.url && (
-              <a
-                href={job.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-md p-2 text-slate-400 hover:bg-white/5"
-                title="View job posting"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </a>
+                  <Send className="h-3.5 w-3.5" />
+                  Apply
+                </button>
+              </div>
             )}
-            <button
-              onClick={() => apply(job.id)}
-              className="flex items-center gap-1.5 rounded-md bg-cyan-500 px-4 py-2 text-sm font-bold text-slate-900 hover:bg-cyan-400"
-            >
-              <Send className="h-3.5 w-3.5" />
-              Apply
-            </button>
-          </div>
-        )}
-      />
+          />
+
+          <JobSection
+            title="Applied"
+            description="Jobs you've applied to (auto or manual)."
+            jobs={appliedJobs}
+            emptyText="No applied jobs yet. Enable Auto-Apply or click Apply on a matching job."
+            glass={glass}
+            nested
+            className="lg:pl-6"
+            renderAction={(job) => {
+              const app = job.applications[0];
+              const label = appliedLabel(app.status);
+              return (
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                      app.status === "submitted"
+                        ? "bg-emerald-500/20 text-emerald-300"
+                        : app.status === "needs_review"
+                          ? "bg-amber-500/20 text-amber-300"
+                          : "bg-white/10 text-slate-400"
+                    }`}
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    {label}
+                  </span>
+                  {job.url && (
+                    <a
+                      href={job.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-sm font-bold text-cyan-400 underline hover:text-cyan-300"
+                    >
+                      View application
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeApplication(app.id)}
+                    disabled={deletingId === app.id}
+                    title="Remove application"
+                    className="rounded-md p-1.5 text-slate-500 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              );
+            }}
+          />
+        </div>
+      </section>
     </div>
   );
 }
@@ -199,6 +211,8 @@ function JobSection({
   emptyText,
   renderAction,
   glass,
+  nested,
+  className,
 }: {
   title: string;
   description: string;
@@ -206,8 +220,14 @@ function JobSection({
   emptyText: string;
   renderAction: (job: DashboardJob) => React.ReactNode;
   glass?: boolean;
+  nested?: boolean;
+  className?: string;
 }) {
-  const sectionWrap = glass ? "dash-box" : "";
+  const sectionWrap = nested
+    ? (className ?? "")
+    : glass
+      ? "dash-box"
+      : "";
   const titleClass = glass
     ? "text-lg font-bold text-white"
     : "section-title mb-1";
@@ -216,11 +236,11 @@ function JobSection({
     ? "dash-box-sm py-8 text-center text-sm text-slate-500"
     : "rounded-lg border border-dashed border-zinc-300 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700";
   const metaClass = glass
-    ? "text-sm font-medium text-slate-400"
-    : "text-sm font-medium text-zinc-500";
+    ? "text-xs font-medium leading-tight text-slate-400"
+    : "text-xs font-medium leading-tight text-zinc-500";
 
   return (
-    <section className={sectionWrap}>
+    <div className={sectionWrap}>
       <h2 className={titleClass}>{title}</h2>
       <p className={`mb-4 mt-1 ${descClass}`}>{description}</p>
 
@@ -228,7 +248,7 @@ function JobSection({
         <p className={emptyClass}>{emptyText}</p>
       ) : (
         <div className="max-h-80 overflow-y-auto pr-1">
-          <ul className="space-y-3">
+          <ul className="space-y-1.5">
           {jobs.map((job) => {
             const { stateCode } = parseJobLocation(job.location);
             const postedLabel = formatJobPostedDate(
@@ -236,15 +256,17 @@ function JobSection({
               job.discoveredAt
             );
             const itemClass = glass
-              ? "dash-box-sm flex flex-wrap items-center justify-between gap-4"
-              : "flex flex-wrap items-center justify-between gap-4 rounded-lg border border-zinc-200 px-6 py-4 dark:border-zinc-800";
+              ? "dash-box-sm flex flex-wrap items-center justify-between gap-2 !px-3 !py-1.5"
+              : "flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-4 py-2 dark:border-zinc-800";
             return (
               <li key={job.id} className={itemClass}>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <h3
                       className={
-                        glass ? "text-lg font-bold text-white" : "item-title"
+                        glass
+                          ? "text-sm font-bold leading-tight text-white"
+                          : "text-base font-bold leading-tight"
                       }
                     >
                       {job.title}
@@ -273,6 +295,6 @@ function JobSection({
           </ul>
         </div>
       )}
-    </section>
+    </div>
   );
 }

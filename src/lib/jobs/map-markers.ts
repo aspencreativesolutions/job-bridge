@@ -56,8 +56,10 @@ export function buildJobMapMarkers(
       locationGroups.set(groupKey, index + 1);
 
       const [dx, dy] = clusterOffset(job.id, index);
-      const placeName =
-        placeNames.get(coordCacheKey(lngLat[0], lngLat[1])) ?? locationKey;
+      const verifiedPlace =
+        placeNames.get(coordCacheKey(lngLat[0], lngLat[1])) ?? null;
+      const placeName = verifiedPlace ?? locationKey;
+      const verifiedState = parseJobLocation(verifiedPlace).stateCode;
 
       return {
         id: job.id,
@@ -67,7 +69,7 @@ export function buildJobMapMarkers(
         company: job.company,
         location: locationKey,
         placeName,
-        stateCode: parsed.stateCode,
+        stateCode: verifiedState ?? parsed.stateCode,
       };
     })
     .filter((m): m is JobMapMarker => m !== null);

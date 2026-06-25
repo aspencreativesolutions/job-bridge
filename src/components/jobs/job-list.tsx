@@ -105,11 +105,11 @@ export function JobList() {
             return (
               <li
                 key={job.id}
-                className="flex flex-wrap items-center justify-between gap-4 px-6 py-4"
+                className="flex flex-wrap items-center justify-between gap-2 px-4 py-2"
               >
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="item-title">{job.title}</h3>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <h3 className="text-sm font-bold leading-tight">{job.title}</h3>
                     {postedLabel && (
                       <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                         {postedLabel}
@@ -117,7 +117,7 @@ export function JobList() {
                     )}
                     <JobSalary salaryMin={job.salaryMin} salaryMax={job.salaryMax} />
                   </div>
-                  <p className="text-sm text-zinc-500">
+                  <p className="text-xs leading-tight text-zinc-500">
                     {job.company}
                     {job.location ? ` · ${job.location}` : ""}
                   </p>
@@ -128,7 +128,7 @@ export function JobList() {
                       href={job.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                      className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
                     >
                       <ExternalLink className="h-4 w-4" />
                     </a>
@@ -140,7 +140,7 @@ export function JobList() {
                   ) : (
                     <button
                       onClick={() => apply(job.id)}
-                      className="flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
+                      className="flex items-center gap-1 rounded-md bg-zinc-900 px-2.5 py-1 text-xs text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
                     >
                       <Send className="h-3.5 w-3.5" />
                       Apply

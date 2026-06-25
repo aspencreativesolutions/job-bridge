@@ -151,16 +151,13 @@ export function CompaniesInFieldBox({ preferences, glass }: Props) {
 
   const fieldSubtext = useMemo(() => {
     if (selectedPosition) {
-      if (inferredFromTitles && industries.length > 0) {
-        return `In ${industries.join(", ")} · Top employers for your position`;
-      }
       return "Top employers for your position";
     }
     if (preferences.industries.length > 0) {
       return "Top employers in your selected industries";
     }
     return "Add a job title or industry to see companies";
-  }, [selectedPosition, inferredFromTitles, industries, preferences.industries]);
+  }, [selectedPosition, preferences.industries]);
 
   const fieldText = glass
     ? "text-base font-semibold text-emerald-300"
@@ -220,7 +217,7 @@ export function CompaniesInFieldBox({ preferences, glass }: Props) {
         <div className="min-w-0">
           <h2 className={`flex items-center gap-2 ${titleText}`}>
             <Building2 className="h-5 w-5 shrink-0 text-emerald-400" />
-            Top Companies for Your Position
+            Top Companies
           </h2>
           <p className={subText}>{fieldSubtext}</p>
           {!expanded && (

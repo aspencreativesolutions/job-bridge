@@ -139,8 +139,8 @@ export function ConfigurePreferences({
     ? "dash-box"
     : "rounded-xl border border-indigo-200 bg-indigo-50 shadow-md dark:border-indigo-800 dark:bg-indigo-950/60";
   const divider = glass
-    ? "border-t border-slate-600/50 pt-5"
-    : "border-t border-indigo-200/80 pt-5 dark:border-indigo-800";
+    ? "border-t border-slate-600/50 pt-4"
+    : "border-t border-indigo-200/80 pt-4 dark:border-indigo-800";
   const titleText = glass
     ? "text-lg font-bold text-white"
     : "text-xl font-bold text-indigo-950 dark:text-indigo-50";
@@ -158,12 +158,12 @@ export function ConfigurePreferences({
     : "text-zinc-900 dark:text-zinc-100";
 
   const listContainerClass = glass
-    ? "rounded-lg border border-slate-600/50 bg-slate-800/40 p-4"
-    : "rounded-lg border border-indigo-200 bg-white/60 p-4 dark:border-indigo-800 dark:bg-indigo-950/40";
+    ? "rounded-lg border border-slate-600/50 bg-slate-800/40 p-2.5"
+    : "rounded-lg border border-indigo-200 bg-white/60 p-2.5 dark:border-indigo-800 dark:bg-indigo-950/40";
 
   const listItemClass = glass
-    ? "flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
-    : "flex items-center gap-2 rounded-md border border-indigo-100 bg-white px-3 py-2 text-sm text-indigo-950 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-50";
+    ? "flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm text-slate-200"
+    : "flex items-center gap-1.5 rounded-md border border-indigo-100 bg-white px-2 py-1 text-sm text-indigo-950 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-50";
 
   return (
     <section className={outer}>
@@ -185,26 +185,28 @@ export function ConfigurePreferences({
       )}
 
       <div className={divider}>
-        <div className="mb-4 grid grid-cols-1 items-start gap-3">
-          <div className={`${listContainerClass} space-y-3`}>
+        <div className="mb-2 grid grid-cols-1 items-start gap-2">
+          <div className={`${listContainerClass} space-y-2`}>
             <div>
-              <p className={labelText}>Your Position</p>
-              <p className={`mt-0.5 ${hintText}`}>
+              <p className={`text-sm font-bold ${glass ? "text-white" : "text-indigo-950 dark:text-indigo-50"}`}>
+                Your Position
+              </p>
+              <p className={`text-xs ${hintText}`}>
                 Positions you&apos;re actively searching for
               </p>
             </div>
             {preferences.jobTitles.length === 0 ? (
-              <p className={`text-sm ${hintText}`}>
+              <p className={`text-xs ${hintText}`}>
                 No titles added yet. Add a role below to build your search list.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {preferences.jobTitles.map((title) => {
                   const { crossIndustry: isCrossIndustry } =
                     getTitleMetadata(title);
                   return (
                     <li key={title} className={listItemClass}>
-                      <span className="min-w-0 font-medium">{title}</span>
+                      <span className="min-w-0 flex-1 truncate font-medium">{title}</span>
                       {isCrossIndustry && (
                         <CrossIndustryTag
                           glass={glass}
@@ -215,22 +217,24 @@ export function ConfigurePreferences({
                       <button
                         type="button"
                         onClick={() => removeTitle(title)}
-                        className={`shrink-0 rounded p-1 transition ${
+                        className={`ml-auto shrink-0 rounded p-0.5 transition ${
                           glass
                             ? "text-slate-400 hover:bg-white/10 hover:text-white"
                             : "text-indigo-400 hover:bg-indigo-50 hover:text-indigo-700 dark:hover:bg-indigo-900 dark:hover:text-indigo-200"
                         }`}
                         aria-label={`Remove ${title}`}
                       >
-                        <X className="h-3.5 w-3.5" />
+                        <X className="h-3 w-3" />
                       </button>
                     </li>
                   );
                 })}
               </ul>
             )}
-            <div className="border-t border-slate-600/40 pt-3">
-              <label className={`mb-1.5 block ${labelText}`}>Add a job title</label>
+            <div className={`border-t pt-2 ${glass ? "border-slate-600/40" : "border-indigo-200/80 dark:border-indigo-800"}`}>
+              <label className={`mb-1 block text-xs font-bold ${glass ? "text-slate-200" : "text-indigo-900 dark:text-indigo-100"}`}>
+                Add a job title
+              </label>
               <JobTitlesInput
                 value={jobTitleDraft}
                 onChange={setJobTitleDraft}
@@ -238,9 +242,6 @@ export function ConfigurePreferences({
                 inputClassName={inputClass}
                 glass={glass}
               />
-              <p className={`mt-1 ${hintText}`}>
-                Type a role, pick a suggestion, then click Add Title or press Enter
-              </p>
             </div>
           </div>
 
